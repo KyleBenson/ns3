@@ -65,6 +65,8 @@ public:
   */
   virtual Ptr<Ipv4RoutingProtocol> Create (Ptr<Node> node) const;
 
+  void SetAttribute (std::string name, const AttributeValue &value);
+
 private:
   /**
    * \internal

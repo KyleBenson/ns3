@@ -33,6 +33,12 @@ Ipv4NixVectorHelper::Ipv4NixVectorHelper (const Ipv4NixVectorHelper &o)
 {
 }
 
+void
+Ipv4NixVectorHelper::SetAttribute (std::string name, const AttributeValue &value)
+{
+  m_agentFactory.Set (name, value);
+}
+
 Ipv4NixVectorHelper* 
 Ipv4NixVectorHelper::Copy (void) const 
 {
