@@ -25,6 +25,7 @@
 #include "ns3/abort.h"
 #include "ns3/names.h"
 #include "ns3/ipv4-list-routing.h"
+#include "ns3/boolean.h"
 
 #include "ipv4-nix-vector-routing.h"
 
@@ -40,12 +41,17 @@ Ipv4NixVectorRouting::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::Ipv4NixVectorRouting")
     .SetParent<Ipv4RoutingProtocol> ()
     .AddConstructor<Ipv4NixVectorRouting> ()
+    .AddAttribute ("FollowDownEdges", 
+                   "If true, the BFS will follow down links and interfaces",
+                   BooleanValue (false),
+                   MakeBooleanAccessor (&Ipv4NixVectorRouting::m_followDownEdges),
+                   MakeBooleanChecker ())
   ;
   return tid;
 }
 
 Ipv4NixVectorRouting::Ipv4NixVectorRouting ()
-  : m_totalNeighbors (0)
+  : m_totalNeighbors (0), m_followDownEdges(false)
 {
   NS_LOG_FUNCTION_NOARGS ();
 }
@@ -89,6 +95,13 @@ void
 Ipv4NixVectorRouting::FlushGlobalNixRoutingCache ()
 {
   NS_LOG_FUNCTION_NOARGS ();
+
+  if (m_followDownEdges)
+    {
+      NS_LOG_LOGIC ("Not flushing global nix routing cache as we want to follow down edges");
+      return;
+    }
+
   NodeList::Iterator listEnd = NodeList::End ();
   for (NodeList::Iterator i = NodeList::Begin (); i != listEnd; i++)
     {
@@ -141,6 +154,8 @@ Ipv4NixVectorRouting::GetNixVector (Ptr<Node> source, Ipv4Address dest, Ptr<NetD
     {
       NS_LOG_DEBUG ("Do not processs packets to self");
       return 0;
+      //BuildNixVectorLocal (nixVector);
+      //return nixVector;
     }
   else
     {
@@ -764,13 +779,13 @@ Ipv4NixVectorRouting::BFS (uint32_t numberOfNodes, Ptr<Node> source,
           if (ipv4)
             {
               uint32_t interfaceIndex = (ipv4)->GetInterfaceForDevice (oif);
-              if (!(ipv4->IsUp (interfaceIndex)))
+              if (!m_followDownEdges && !ipv4->IsUp (interfaceIndex))
                 {
                   NS_LOG_LOGIC ("Ipv4Interface is down");
                   return false;
                 }
             }
-          if (!(oif->IsLinkUp ()))
+          if (!m_followDownEdges && !oif->IsLinkUp ())
             {
               NS_LOG_LOGIC ("Link is down.");
               return false;
@@ -820,13 +835,13 @@ Ipv4NixVectorRouting::BFS (uint32_t numberOfNodes, Ptr<Node> source,
               if (ipv4)
                 {
                   uint32_t interfaceIndex = (ipv4)->GetInterfaceForDevice (currNode->GetDevice (i));
-                  if (!(ipv4->IsUp (interfaceIndex)))
+                  if (!m_followDownEdges && !ipv4->IsUp (interfaceIndex))
                     {
                       NS_LOG_LOGIC ("Ipv4Interface is down");
                       continue;
                     }
                 }
-              if (!(localNetDevice->IsLinkUp ()))
+              if (!m_followDownEdges && !localNetDevice->IsLinkUp ())
                 {
                   NS_LOG_LOGIC ("Link is down.");
                   continue;
