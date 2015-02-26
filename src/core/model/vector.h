@@ -43,6 +43,9 @@ public:
    * Create vector (0.0, 0.0, 0.0)
    */
   Vector3D ();
+  bool operator== (const Vector3D &vector) const;
+  bool operator!= (const Vector3D &vector) const;
+  bool operator< (const Vector3D &vector) const;
   /**
    * x coordinate of vector
    */
@@ -74,6 +77,11 @@ public:
    * Create vector vector (0.0, 0.0)
    */
   Vector2D ();
+
+  bool operator!= (const Vector2D &vector) const;
+  bool operator== (const Vector2D &vector) const;
+  bool operator< (const Vector2D &vector) const;
+
   /**
    * x coordinate of vector
    */
