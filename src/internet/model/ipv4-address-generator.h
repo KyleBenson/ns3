@@ -43,6 +43,7 @@ public:
 
   static void Reset (void);
   static bool AddAllocated (const Ipv4Address addr);
+  static bool IsAllocated (const Ipv4Address addr);
 
   static void TestMode (void);
 };
