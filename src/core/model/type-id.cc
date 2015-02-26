@@ -571,6 +571,48 @@ TypeId::SetAttributeInitialValue(uint32_t i,
   return true;
 }
 
+bool
+TypeId::SetAttributeInitialValue(std::string attributeName,
+                                 Ptr<const AttributeValue> initialValue)
+{
+  //this is basically a repeat of LookupAttributeByName, but that function doesn't
+  //tell us if the attribute was found in the parent so we reproduce it here to
+  //help copy a modified attribute into the child's attribute-space
+
+  /*NS_LOG_FUNCTION (this << name << info);
+  TypeId tid;
+  TypeId nextTid = *this;
+  do {
+      tid = nextTid;
+      for (uint32_t i = 0; i < tid.GetAttributeN (); i++)
+        {
+          struct TypeId::AttributeInformation tmp = tid.GetAttribute(i);
+          if (tmp.name == name)
+            {
+              if (tid == (TypeId)*this)
+                *info = tmp;
+              else //parent
+                {
+                  //TODO: add a copy to our attribute, which asserts currently.  SetAttributeInitialValue seems to only be doable via the index, perhaps add a setbystr method?
+                }
+              return true;
+            }
+        }
+      nextTid = tid.GetParent ();
+    } while (nextTid != tid);
+  */
+  
+  for (uint32_t j = 0; j < GetAttributeN (); j++)
+    {
+      struct TypeId::AttributeInformation tmp = GetAttribute(j);
+      if (tmp.name == attributeName)
+        {
+          return SetAttributeInitialValue (j, initialValue);
+        }
+    }
+  return false;
+}
+
 
 Callback<ObjectBase *> 
 TypeId::GetConstructor (void) const

@@ -244,6 +244,14 @@ public:
                                 Ptr<const AttributeValue> initialValue);
 
   /**
+   * \param attributeName the attribute to manipulate
+   * \param initialValue the new initial value to use for this attribute.
+   * \returns true if the call was successfuly, false otherwise.
+   */
+  bool SetAttributeInitialValue(std::string attributeName,
+                                Ptr<const AttributeValue> initialValue);
+
+  /**
    * \param name the name of the new attribute
    * \param help some help text which describes the purpose of this
    *        attribute
