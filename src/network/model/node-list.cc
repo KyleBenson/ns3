@@ -86,7 +86,8 @@ NodeListPriv::DoGet (void)
     {
       ptr = CreateObject<NodeListPriv> ();
       Config::RegisterRootNamespaceObject (ptr);
-      Simulator::ScheduleDestroy (&NodeListPriv::Delete);
+      //TODO: wrap in #ifdef GEOCRON
+      //Simulator::ScheduleDestroy (&NodeListPriv::Delete);
     }
   return &ptr;
 }

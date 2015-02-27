@@ -200,6 +200,30 @@ restart:
         }
     }
 }
+void
+Object::Reset (void)
+{
+  /**
+   * Note: the code here is a bit tricky because we need to protect ourselves from
+   * modifications in the aggregate array while DoReset is called. The user's
+   * implementation of the DoReset method could call GetObject (which could
+   * reorder the array) and it could call AggregateObject which would add an 
+   * object at the end of the array. To be safe, we restart iteration over the 
+   * array whenever we call some user code, just in case.
+   */
+restart:
+  uint32_t n = m_aggregates->n;
+  for (uint32_t i = 0; i < n; i++)
+    {
+      Object *current = m_aggregates->buffer[i];
+      if (current->m_started)
+        {
+          current->DoReset ();
+          current->m_started = false;
+          goto restart;
+        }
+    }
+}
 void 
 Object::Dispose (void)
 {
@@ -343,6 +367,12 @@ Object::DoStart (void)
 {
   NS_LOG_FUNCTION (this);
   NS_ASSERT (!m_started);
+}
+
+void
+Object::DoReset (void)
+{
+  NS_ASSERT (m_started);
 }
 
 bool 

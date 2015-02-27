@@ -162,6 +162,16 @@ private:
    */
   void Start (void);
 
+  /**
+   * This method calls the virtual Reset method on all the objects
+   * aggregated to this object. Reset will be called only once over
+   * the lifetime of an object, just like DoDispose is called only
+   * once.
+   *
+   * \sa Reset
+   */
+  void Reset (void);
+
 protected:
   /**
    * This method is invoked whenever two sets of objects are aggregated together.
@@ -181,6 +191,16 @@ protected:
    * safe to call GetObject and AggregateObject from within this method.
    */
   virtual void DoStart (void);
+  /**
+   * This method is called only once by Object::Reset. If the user
+   * calls Object::Reset multiple times, DoStart is called only the
+   * first time.
+   *
+   * Subclasses are expected to override this method and _chain up_
+   * to their parent's implementation once they are done. It is
+   * safe to call GetObject and AggregateObject from within this method.
+   */
+  virtual void DoReset (void);
   /**
    * This method is called by Object::Dispose or by the object's 
    * destructor, whichever comes first.

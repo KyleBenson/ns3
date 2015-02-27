@@ -86,7 +86,8 @@ ChannelListPriv::DoGet (void)
     {
       ptr = CreateObject<ChannelListPriv> ();
       Config::RegisterRootNamespaceObject (ptr);
-      Simulator::ScheduleDestroy (&ChannelListPriv::Delete);
+      //TODO: wrap this in some #ifdef GEOCRON
+      //Simulator::ScheduleDestroy (&ChannelListPriv::Delete);
     }
   return &ptr;
 }
