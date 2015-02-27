@@ -643,6 +643,7 @@ def add_scratch_programs(bld):
             obj.target = filename
             obj.name = obj.target
             obj.install_path = None
+            obj.lib = ['boost_system', 'boost_filesystem'] #needed for scratch to use boost libs
         elif filename.endswith(".cc"):
             name = filename[:-len(".cc")]
             obj = bld.create_ns3_program(name, all_modules)
