@@ -61,10 +61,14 @@ int main()
             ]
     conf.env['LIBPATH_BRITE'] = [os.path.abspath(os.path.join(conf.env['WITH_BRITE'], '.'))]
 
-    conf.env.append_value('CXXDEFINES', 'NS3_BRITE')
-    conf.env.append_value('CPPPATH', conf.env['CPPPATH_BRITE'])
+    conf.env.append_value('CXXFLAGS', '-Wno-error=unknown-pragmas')
+    conf.env.append_value('CXXFLAGS', '-Wno-deprecated')
+    # this seems to be necessary to append so that waf can find the Brite.h header, at least on my Ubuntu VM running on OS X...
+    conf.env.append_value('INCLUDES', conf.env['WITH_BRITE'])
 
-    conf.env['BRITE'] = conf.check(fragment=test_code, lib='brite', libpath=conf.env['LIBPATH_BRITE'], use='BRITE DL')
+    conf.env['BRITE'] = conf.check(fragment=test_code,
+        lib='brite',
+        libpath=conf.env['LIBPATH_BRITE'], use='BRITE DL')
     conf.report_optional_feature("brite", "BRITE Integration",
                                           conf.env['BRITE'], "BRITE library not found")
 
@@ -78,7 +82,10 @@ def build(bld):
     if 'brite' in bld.env['MODULES_NOT_BUILT']:
         return
 
-    module = bld.create_ns3_module('brite', ['network', 'core', 'internet', 'point-to-point'])
+    deps = ['network', 'core', 'internet', 'point-to-point', 'mobility']
+    if bld.env['ENABLE_TESTS']:
+        deps.append('applications') # required by BRITE test suite
+    module = bld.create_ns3_module('brite', deps)
     module.source = [
         ]
 

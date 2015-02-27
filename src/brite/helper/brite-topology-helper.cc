@@ -24,6 +24,7 @@
 #include "ns3/random-variable-stream.h"
 #include "ns3/data-rate.h"
 #include "ns3/rng-seed-manager.h"
+#include "ns3/mobility-module.h"
 
 #include "brite-topology-helper.h"
 
@@ -477,6 +478,17 @@ BriteTopologyHelper::ConstructTopology ()
         {
           m_asLeafNodes[(*it).asId]->Add (m_nodes.Get ((*it).nodeId));
         }
+
+      // add position information via a mobility model
+      MobilityHelper mobility;
+      // put the location for this node in a list for the helper
+      Ptr<ListPositionAllocator> positionAllocator = CreateObject<ListPositionAllocator> ();
+
+      Vector position = Vector (it->xCoordinate, it->yCoordinate, 0);
+      positionAllocator->Add (position);
+
+      mobility.SetPositionAllocator (positionAllocator);
+      mobility.Install (m_nodes.Get (it->nodeId));
     }
 }
 
