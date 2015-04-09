@@ -44,6 +44,11 @@ RonPathHeuristic::GetTypeId (void)
                    BooleanValue (false),
                    MakeBooleanAccessor (&RonPathHeuristic::m_updatedOnce),
                    MakeBooleanChecker ())
+    .AddAttribute ("Random",
+            "The random variable for random decisions.",
+            StringValue ("ns3::UniformRandomVariable"),
+            MakePointerAccessor (&RonPathHeuristic::m_random),
+            MakePointerChecker<RandomVariableStream> ())
     /*.AddAttribute ("SummaryName", "Short name that summarizes parameters, aggregations, etc. to be used when creating filenames",
                    StringValue ("base"),
                    MakeStringAccessor (&RonPathHeuristic::m_summaryName),

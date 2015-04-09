@@ -26,9 +26,9 @@
 #include <ns3/lte-control-messages.h>
 
 
-NS_LOG_COMPONENT_DEFINE ("LteSpectrumSignalParameters");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("LteSpectrumSignalParameters");
 
 LteSpectrumSignalParameters::LteSpectrumSignalParameters ()
 {
@@ -101,6 +101,7 @@ LteSpectrumSignalParametersDlCtrlFrame::LteSpectrumSignalParametersDlCtrlFrame (
 {
   NS_LOG_FUNCTION (this << &p);
   cellId = p.cellId;
+  pss = p.pss;
   ctrlMsgList = p.ctrlMsgList;
 }
 

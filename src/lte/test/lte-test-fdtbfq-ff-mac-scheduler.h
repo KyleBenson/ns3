@@ -27,7 +27,7 @@
 #include "ns3/test.h"
 
 
-namespace ns3 {
+using namespace ns3;
 
 
 /**
@@ -42,26 +42,26 @@ namespace ns3 {
 class LenaFdTbfqFfMacSchedulerTestCase1 : public TestCase
 {
 public:
-  LenaFdTbfqFfMacSchedulerTestCase1 (uint16_t nUser, uint16_t nLc, uint16_t dist, double thrRefDl, double thrRefUl, uint16_t packetSize, uint16_t interval);
+  LenaFdTbfqFfMacSchedulerTestCase1 (uint16_t nUser, uint16_t dist, double thrRefDl, double thrRefUl, uint16_t packetSize, uint16_t interval, bool  errorModelEnabled);
   virtual ~LenaFdTbfqFfMacSchedulerTestCase1 ();
 
 private:
   static std::string BuildNameString (uint16_t nUser, uint16_t dist);
   virtual void DoRun (void);
   uint16_t m_nUser;
-  uint16_t m_nLc;
   uint16_t m_dist;
   uint16_t m_packetSize;  // byte
   uint16_t m_interval;    // ms
   double m_thrRefDl;
   double m_thrRefUl;
+  bool m_errorModelEnabled;
 };
 
 
 class LenaFdTbfqFfMacSchedulerTestCase2 : public TestCase
 {
 public:
-  LenaFdTbfqFfMacSchedulerTestCase2 (std::vector<uint16_t> dist, std::vector<uint32_t> estThrFdTbfqDl, std::vector<uint16_t> packetSize, uint16_t interval);
+  LenaFdTbfqFfMacSchedulerTestCase2 (std::vector<uint16_t> dist, std::vector<uint32_t> estThrFdTbfqDl, std::vector<uint16_t> packetSize, uint16_t interval, bool  errorModelEnabled);
   virtual ~LenaFdTbfqFfMacSchedulerTestCase2 ();
 
 private:
@@ -72,6 +72,7 @@ private:
   std::vector<uint16_t> m_packetSize;  // byte
   uint16_t m_interval;    // ms
   std::vector<uint32_t> m_estThrFdTbfqDl;
+  bool m_errorModelEnabled;
 };
 
 
@@ -81,10 +82,6 @@ public:
   LenaTestFdTbfqFfMacSchedulerSuite ();
 };
 
-
-
-
-} // namespace ns3
 
 
 #endif /* LENA_TEST_FDTBFQ_FF_MAC_SCHEDULER_H */

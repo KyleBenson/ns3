@@ -32,6 +32,11 @@ namespace ns3 {
  */
 struct GbrQosInformation
 {
+  /** 
+   * Default constructor, inizializes member variables to zero or equivalent
+   */
+  GbrQosInformation ();
+
   uint64_t gbrDl;  /**< Guaranteed Bit Rate (bit/s) in downlink */
   uint64_t gbrUl;  /**< Guaranteed Bit Rate (bit/s) in uplink */
   uint64_t mbrDl;  /**< Maximum Bit Rate (bit/s) in downlink */
@@ -45,9 +50,13 @@ struct GbrQosInformation
  */
 struct AllocationRetentionPriority
 {
+  /** 
+   * Default constructor, inizializes member variables to zero or equivalent
+   */
+  AllocationRetentionPriority ();
   uint8_t priorityLevel;     // /< 1-15; 1 = highest
-  bool preemprionCapability; // /< true if bearer can preempt others
-  bool preemprionVulnerability; // true if bearer can be preempted by others
+  bool preemptionCapability; // /< true if bearer can preempt others
+  bool preemptionVulnerability; // true if bearer can be preempted by others
 };
 
 /**
@@ -80,6 +89,12 @@ struct EpsBearer
 
   GbrQosInformation gbrQosInfo;
   AllocationRetentionPriority arp;
+
+  /**
+   * Deault constructor. QCI will be initialized to NGBR_VIDEO_TCP_DEFAULT
+   * 
+   */
+  EpsBearer ();
 
   /**
    *
@@ -118,8 +133,6 @@ struct EpsBearer
    */
   double  GetPacketErrorLossRate () const;
 
-private:
-  EpsBearer ();
 };
 
 } // namespace ns3

@@ -27,7 +27,7 @@
 namespace ns3 {
 
 std::ostream &
-operator<< (std::ostream &os, UanPdp &pdp)
+operator<< (std::ostream &os, const UanPdp &pdp)
 {
   os << pdp.GetNTaps () << '|';
   os << pdp.GetResolution ().GetSeconds () << '|';
@@ -64,7 +64,7 @@ operator>> (std::istream &is, UanPdp &pdp)
 
   std::complex<double> amp;
   pdp.m_taps = std::vector<Tap> (ntaps);
-  for (uint32_t i = 0; i < ntaps; i++)
+  for (uint32_t i = 0; i < ntaps && !is.eof (); i++)
     {
       is >> amp >> c1;
       if (c1 != '|')

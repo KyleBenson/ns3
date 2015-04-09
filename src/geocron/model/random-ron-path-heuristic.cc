@@ -54,5 +54,5 @@ RandomRonPathHeuristic::GetTypeId (void)
 double
 RandomRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
 {
-  return random.GetValue ();
+  return m_random->GetValue ();
 }

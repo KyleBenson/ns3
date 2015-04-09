@@ -35,6 +35,7 @@
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("UdpEchoServerApplication");
+
 NS_OBJECT_ENSURE_REGISTERED (UdpEchoServer);
 
 TypeId
@@ -157,7 +158,7 @@ UdpEchoServer::HandleRead (Ptr<Socket> socket)
         {
           NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s server received " << packet->GetSize () << " bytes from " <<
                        Inet6SocketAddress::ConvertFrom (from).GetIpv6 () << " port " <<
-                       InetSocketAddress::ConvertFrom (from).GetPort ());
+                       Inet6SocketAddress::ConvertFrom (from).GetPort ());
         }
 
       packet->RemoveAllPacketTags ();
@@ -176,7 +177,7 @@ UdpEchoServer::HandleRead (Ptr<Socket> socket)
         {
           NS_LOG_INFO ("At time " << Simulator::Now ().GetSeconds () << "s server sent " << packet->GetSize () << " bytes to " <<
                        Inet6SocketAddress::ConvertFrom (from).GetIpv6 () << " port " <<
-                       InetSocketAddress::ConvertFrom (from).GetPort ());
+                       Inet6SocketAddress::ConvertFrom (from).GetPort ());
         }
     }
 }

@@ -25,9 +25,11 @@
 #include <iostream>
 #include <cstring>
 
+namespace ns3 {
+
 NS_LOG_COMPONENT_DEFINE ("Mac64Address");
 
-namespace ns3 {
+ATTRIBUTE_HELPER_CPP (Mac64Address);
 
 #define ASCII_a (0x41)
 #define ASCII_z (0x5a)
@@ -36,6 +38,11 @@ namespace ns3 {
 #define ASCII_COLON (0x3a)
 #define ASCII_ZERO (0x30)
 
+/**
+ * Converts a char to lower case.
+ * \param c the char
+ * \returns the lower case
+ */
 static char
 AsciiToLowCase (char c)
 {
@@ -84,7 +91,7 @@ Mac64Address::Mac64Address (const char *str)
         }
       str++;
     }
-  NS_ASSERT (i == 6);
+  NS_ASSERT (i == 8);
 }
 void 
 Mac64Address::CopyFrom (const uint8_t buffer[8])
@@ -151,19 +158,6 @@ Mac64Address::GetType (void)
   return type;
 }
 
-bool operator == (const Mac64Address &a, const Mac64Address &b)
-{
-  uint8_t ada[8];
-  uint8_t adb[8];
-  a.CopyTo (ada);
-  b.CopyTo (adb);
-  return std::memcmp (ada, adb, 8) == 0;
-}
-bool operator != (const Mac64Address &a, const Mac64Address &b)
-{
-  return !(a == b);
-}
-
 std::ostream& operator<< (std::ostream& os, const Mac64Address & address)
 {
   uint8_t ad[8];
@@ -182,5 +176,31 @@ std::ostream& operator<< (std::ostream& os, const Mac64Address & address)
   return os;
 }
 
+std::istream& operator>> (std::istream& is, Mac64Address & address)
+{
+  std::string v;
+  is >> v;
+
+  std::string::size_type col = 0;
+  for (uint8_t i = 0; i < 8; ++i)
+    {
+      std::string tmp;
+      std::string::size_type next;
+      next = v.find (":", col);
+      if (next == std::string::npos)
+        {
+          tmp = v.substr (col, v.size ()-col);
+          address.m_address[i] = strtoul (tmp.c_str(), 0, 16);
+          break;
+        }
+      else
+        {
+          tmp = v.substr (col, next-col);
+          address.m_address[i] = strtoul (tmp.c_str(), 0, 16);
+          col = next + 1;
+        }
+    }
+  return is;
+}
 
 } // namespace ns3

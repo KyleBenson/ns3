@@ -1,3 +1,7 @@
+# GeoCRON stuff
+ron_output
+
+# ns-3 and general stuff
 build
 ns3
 testpy-output

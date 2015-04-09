@@ -40,9 +40,9 @@
 #include "ipv6-l3-protocol.h"
 #include "udp-socket-impl.h"
 
-NS_LOG_COMPONENT_DEFINE ("UdpL4Protocol");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("UdpL4Protocol");
 
 NS_OBJECT_ENSURE_REGISTERED (UdpL4Protocol);
 
@@ -402,7 +402,7 @@ UdpL4Protocol::Receive (Ptr<Packet> packet,
   for (Ipv6EndPointDemux::EndPointsI endPoint = endPoints.begin ();
        endPoint != endPoints.end (); endPoint++)
     {
-      (*endPoint)->ForwardUp (packet->Copy (), header, udpHeader.GetSourcePort ());
+      (*endPoint)->ForwardUp (packet->Copy (), header, udpHeader.GetSourcePort (), interface);
     }
   return IpL4Protocol::RX_OK;
 }

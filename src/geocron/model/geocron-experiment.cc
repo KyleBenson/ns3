@@ -40,6 +40,11 @@ GeocronExperiment::GetTypeId ()
                    StringValue ("brite"),
                    MakeStringAccessor (&GeocronExperiment::topologyType),
                    MakeStringChecker ())
+    .AddAttribute ("Random",
+            "The random variable for random decisions.",
+            StringValue ("ns3::UniformRandomVariable"),
+            MakePointerAccessor (&GeocronExperiment::random),
+            MakePointerChecker<RandomVariableStream> ())
   ;
   return tid;
 }
@@ -79,6 +84,7 @@ Ptr<RegionHelper> GeocronExperiment::GetRegionHelper ()
       else {
         NS_ASSERT_MSG(false, "Invalid topology type: " << topologyType);
       }
+      NS_LOG_INFO ("Using topology generator " << topologyType);
     }
   return regionHelper;
 }
@@ -431,6 +437,8 @@ GeocronExperiment::RunAllScenarios ()
   boost::hash_combine (seed, getpid());
   SeedManager::SetSeed(seed);
   int runSeed = 0;
+
+  // Loop over all the possible scenarios, running the simulation and resetting between each
   for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
        disasterLocation != disasterLocations->end (); disasterLocation++)
     {
@@ -677,7 +685,7 @@ GeocronExperiment::ApplyFailureModel () {
     {
       Ptr<Node> node = nodeItr->second;
       // Fail nodes within the disaster region with some probability
-      if (random.GetValue () < currFprob)
+      if (random->GetValue () < currFprob)
         {
           failNodes.Add (node);
           NS_LOG_LOGIC ("Node " << (node)->GetId () << " failed.");
@@ -692,7 +700,7 @@ GeocronExperiment::ApplyFailureModel () {
 
         for (uint32_t i = 1; i <= GetNodeDegree(node); i++)
           {
-            if (random.GetValue () < currFprob)
+            if (random->GetValue () < currFprob)
               {
                 ifacesToKill.Add(ipv4, i);
                 FailIpv4 (ipv4, i);
@@ -730,8 +738,8 @@ GeocronExperiment::SetNextServers () {
   NS_LOG_LOGIC ("Choosing from " << serverNodeCandidates[currLocation].GetN () << " server provider candidates.");
 
   Ptr<Node> serverNode = (serverNodeCandidates[currLocation].GetN () ?
-                          serverNodeCandidates[currLocation].Get (random.GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)) :
-                          nodes.Get (random.GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)));
+                          serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)) :
+                          nodes.Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)));
 
   //Application
   RonServerHelper ronServer (9);

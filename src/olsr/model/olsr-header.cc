@@ -30,10 +30,11 @@
 #define OLSR_PKT_HEADER_SIZE 4
 
 namespace ns3 {
+  
+NS_LOG_COMPONENT_DEFINE ("OlsrHeader");
+
 namespace olsr {
 
-
-NS_LOG_COMPONENT_DEFINE ("OlsrHeader");
 
 /// Scaling factor used in RFC 3626.
 #define OLSR_C 0.0625
@@ -130,7 +131,7 @@ PacketHeader::GetSerializedSize (void) const
 void 
 PacketHeader::Print (std::ostream &os) const
 {
-  // TODO
+  /// \todo
 }
 
 void
@@ -207,7 +208,7 @@ MessageHeader::GetSerializedSize (void) const
 void 
 MessageHeader::Print (std::ostream &os) const
 {
-  // TODO
+  /// \todo
 }
 
 void
@@ -288,7 +289,7 @@ MessageHeader::Mid::GetSerializedSize (void) const
 void 
 MessageHeader::Mid::Print (std::ostream &os) const
 {
-  // TODO
+  /// \todo
 }
 
 void
@@ -340,7 +341,7 @@ MessageHeader::Hello::GetSerializedSize (void) const
 void 
 MessageHeader::Hello::Print (std::ostream &os) const
 {
-  // TODO
+  /// \todo
 }
 
 void
@@ -423,7 +424,7 @@ MessageHeader::Tc::GetSerializedSize (void) const
 void 
 MessageHeader::Tc::Print (std::ostream &os) const
 {
-  // TODO
+  /// \todo
 }
 
 void
@@ -473,7 +474,7 @@ MessageHeader::Hna::GetSerializedSize (void) const
 void 
 MessageHeader::Hna::Print (std::ostream &os) const
 {
-  // TODO
+  /// \todo
 }
 
 void

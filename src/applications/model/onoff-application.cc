@@ -26,6 +26,7 @@
 #include "ns3/address.h"
 #include "ns3/inet-socket-address.h"
 #include "ns3/inet6-socket-address.h"
+#include "ns3/packet-socket-address.h"
 #include "ns3/node.h"
 #include "ns3/nstime.h"
 #include "ns3/data-rate.h"
@@ -41,9 +42,9 @@
 #include "ns3/string.h"
 #include "ns3/pointer.h"
 
-NS_LOG_COMPONENT_DEFINE ("OnOffApplication");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("OnOffApplication");
 
 NS_OBJECT_ENSURE_REGISTERED (OnOffApplication);
 
@@ -85,7 +86,8 @@ OnOffApplication::GetTypeId (void)
                    MakeTypeIdAccessor (&OnOffApplication::m_tid),
                    MakeTypeIdChecker ())
     .AddTraceSource ("Tx", "A new packet is created and is sent",
-                     MakeTraceSourceAccessor (&OnOffApplication::m_txTrace))
+                     MakeTraceSourceAccessor (&OnOffApplication::m_txTrace),
+                     "ns3::Packet::TracedCallback")
   ;
   return tid;
 }
@@ -148,7 +150,15 @@ void OnOffApplication::StartApplication () // Called at time specified by Start
   if (!m_socket)
     {
       m_socket = Socket::CreateSocket (GetNode (), m_tid);
-      m_socket->Bind ();
+      if (Inet6SocketAddress::IsMatchingType (m_peer))
+        {
+          m_socket->Bind6 ();
+        }
+      else if (InetSocketAddress::IsMatchingType (m_peer) ||
+               PacketSocketAddress::IsMatchingType (m_peer))
+        {
+          m_socket->Bind ();
+        }
       m_socket->Connect (m_peer);
       m_socket->SetAllowBroadcast (true);
       m_socket->ShutdownRecv ();
@@ -157,6 +167,8 @@ void OnOffApplication::StartApplication () // Called at time specified by Start
         MakeCallback (&OnOffApplication::ConnectionSucceeded, this),
         MakeCallback (&OnOffApplication::ConnectionFailed, this));
     }
+  m_cbrRateFailSafe = m_cbrRate;
+
   // Insure no pending event
   CancelEvents ();
   // If we are not yet connected, there is nothing to do here
@@ -184,13 +196,14 @@ void OnOffApplication::CancelEvents ()
 {
   NS_LOG_FUNCTION (this);
 
-  if (m_sendEvent.IsRunning ())
+  if (m_sendEvent.IsRunning () && m_cbrRateFailSafe == m_cbrRate )
     { // Cancel the pending send packet event
       // Calculate residual bits since last packet sent
       Time delta (Simulator::Now () - m_lastStartTime);
       int64x64_t bits = delta.To (Time::S) * m_cbrRate.GetBitRate ();
       m_residualBits += bits.GetHigh ();
     }
+  m_cbrRateFailSafe = m_cbrRate;
   Simulator::Cancel (m_sendEvent);
   Simulator::Cancel (m_startStopEvent);
 }

@@ -27,9 +27,9 @@
 #include "ns3/nstime.h"
 #include "ns3/simulator.h"
 
-NS_LOG_COMPONENT_DEFINE ("Application");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("Application");
 
 NS_OBJECT_ENSURE_REGISTERED (Application);
 
@@ -89,7 +89,7 @@ Application::DoDispose (void)
 }
 
 void
-Application::DoStart (void)
+Application::DoInitialize (void)
 {
   NS_LOG_FUNCTION (this);
   m_startEvent = Simulator::Schedule (m_startTime, &Application::StartApplication, this);
@@ -97,7 +97,7 @@ Application::DoStart (void)
     {
       m_stopEvent = Simulator::Schedule (m_stopTime, &Application::StopApplication, this);
     }
-  Object::DoStart ();
+  Object::DoInitialize ();
 }
 
 Ptr<Node> Application::GetNode () const

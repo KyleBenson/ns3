@@ -32,16 +32,19 @@
 #include "ns3/boolean.h"
 #include "ns3/simulator.h"
 
-NS_LOG_COMPONENT_DEFINE ("Node");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("Node");
 
 NS_OBJECT_ENSURE_REGISTERED (Node);
 
-GlobalValue g_checksumEnabled  = GlobalValue ("ChecksumEnabled",
-                                              "A global switch to enable all checksums for all protocols",
-                                              BooleanValue (false),
-                                              MakeBooleanChecker ());
+/**
+ * \brief A global switch to enable all checksums for all protocols.
+ */
+static GlobalValue g_checksumEnabled  = GlobalValue ("ChecksumEnabled",
+                                                     "A global switch to enable all checksums for all protocols",
+                                                     BooleanValue (false),
+                                                     MakeBooleanChecker ());
 
 TypeId 
 Node::GetTypeId (void)
@@ -61,6 +64,11 @@ Node::GetTypeId (void)
                    TypeId::ATTR_GET, // allow only getting it.
                    UintegerValue (0),
                    MakeUintegerAccessor (&Node::m_id),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("SystemId", "The systemId of this node: a unique integer used for parallel simulations.",
+                   TypeId::ATTR_GET || TypeId::ATTR_SET,
+                   UintegerValue (0),
+                   MakeUintegerAccessor (&Node::m_sid),
                    MakeUintegerChecker<uint32_t> ())
   ;
   return tid;
@@ -118,7 +126,7 @@ Node::AddDevice (Ptr<NetDevice> device)
   device->SetIfIndex (index);
   device->SetReceiveCallback (MakeCallback (&Node::NonPromiscReceiveFromDevice, this));
   Simulator::ScheduleWithContext (GetId (), Seconds (0.0), 
-                                  &NetDevice::Start, device);
+                                  &NetDevice::Initialize, device);
   NotifyDeviceAdded (device);
   return index;
 }
@@ -145,7 +153,7 @@ Node::AddApplication (Ptr<Application> application)
   m_applications.push_back (application);
   application->SetNode (this);
   Simulator::ScheduleWithContext (GetId (), Seconds (0.0), 
-                                  &Application::Start, application);
+                                  &Application::Initialize, application);
   return index;
 }
 Ptr<Application> 
@@ -188,23 +196,23 @@ Node::DoDispose ()
   Object::DoDispose ();
 }
 void 
-Node::DoStart (void)
+Node::DoInitialize (void)
 {
   NS_LOG_FUNCTION (this);
   for (std::vector<Ptr<NetDevice> >::iterator i = m_devices.begin ();
        i != m_devices.end (); i++)
     {
       Ptr<NetDevice> device = *i;
-      device->Start ();
+      device->Initialize ();
     }
   for (std::vector<Ptr<Application> >::iterator i = m_applications.begin ();
        i != m_applications.end (); i++)
     {
       Ptr<Application> application = *i;
-      application->Start ();
+      application->Initialize ();
     }
 
-  Object::DoStart ();
+  Object::DoInitialize ();
 }
 
 void

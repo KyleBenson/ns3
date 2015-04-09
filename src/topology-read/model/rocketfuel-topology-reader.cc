@@ -44,6 +44,8 @@ TypeId RocketfuelTopologyReader::GetTypeId (void)
 
 RocketfuelTopologyReader::RocketfuelTopologyReader ()
 {
+  m_linksNumber = 0;
+  m_nodesNumber = 0;
   NS_LOG_FUNCTION (this);
 }
 
@@ -53,6 +55,7 @@ RocketfuelTopologyReader::~RocketfuelTopologyReader ()
 }
 
 /* uid @loc [+] [bb] (num_neigh) [&ext] -> <nuid-1> <nuid-2> ... {-euid} ... =name[!] rn */
+
 
 #define REGMATCH_MAX 16
 
@@ -78,14 +81,36 @@ RocketfuelTopologyReader::~RocketfuelTopologyReader ()
 
 int linksNumber = 0;
 int nodesNumber = 0;
-// nodeMap indexed by "uid"
-std::map<std::string, Ptr<Node> > nodeMap;
+// m_nodeMap indexed by "uid"
+std::map<std::string, Ptr<Node> > m_nodeMap;
 // linkMap indexed by "fromUid>toUid"
 std::map<std::string, TopologyReader::Link *> linkMap;
 // mapping of UIDs to IP addresses when alias files are available
 std::map<std::string, std::string> nodeAddresses;
 // whether the file contains latencies or weights
 bool isLatencies;
+
+/**
+ * \brief Print node info
+ * \param uid node ID
+ * \param loc node location
+ * \param dns is a DNS node ?
+ * \param bb is a BB node ?
+ * \param neighListSize size of neighbor list
+ * \param name node name
+ * \param radius node radius
+ */
+static inline void
+PrintNodeInfo (std::string & uid, std::string & loc, bool dns, bool bb,
+               std::vector <std::string>::size_type neighListSize,
+               std::string & name, int radius)
+{
+    /* uid @loc [+] [bb] (num_neigh) [&ext] -> <nuid-1> <nuid-2> ... {-euid} ... =name[!] rn */
+    NS_LOG_INFO ("Load Node[" << uid << "]: location: " << loc << " dns: " << dns
+            << " bb: " << bb << " neighbors: " << neighListSize
+            << "(" << "%d" << ") externals: \"%s\"(%d) "
+            << "name: " << name << " radius: " << radius);
+}
 
 RocketfuelTopologyReader::LatenciesMap
 RocketfuelTopologyReader::ReadLatencies (std::string filename)
@@ -242,7 +267,7 @@ RocketfuelTopologyReader::GenerateFromMapsFile (int argc, char *argv[])
   /* external neighbors */
   if (argv[7])
     {
-      //      euid = argv[7];
+      // euid = argv[7];
     }
 
   /* name */
@@ -280,12 +305,12 @@ RocketfuelTopologyReader::GenerateFromMapsFile (int argc, char *argv[])
   // Create node and link
   if (!uid.empty ())
     {
-      if (nodeMap[uid] == 0)
+      if (m_nodeMap[uid] == 0)
         {
-           Ptr<Node> tmpNode = CreateObject<Node> ();
-          nodeMap[uid] = tmpNode;
+          Ptr<Node> tmpNode = CreateObject<Node> ();
+          m_nodeMap[uid] = tmpNode;
           nodes.Add (tmpNode);
-          nodesNumber++;
+          m_nodesNumber++;
         }
 
       for (uint32_t i = 0; i < neigh_list.size (); ++i)
@@ -297,12 +322,12 @@ RocketfuelTopologyReader::GenerateFromMapsFile (int argc, char *argv[])
               return nodes;
             }
 
-          if (nodeMap[nuid] == 0)
+          if (m_nodeMap[nuid] == 0)
             {
               Ptr<Node> tmpNode = CreateObject<Node> ();
-              nodeMap[nuid] = tmpNode;
+              m_nodeMap[nuid] = tmpNode;
               nodes.Add (tmpNode);
-              nodesNumber++;
+              m_nodesNumber++;
             }
 
           // Only create link if the neighbor didn't create it already!
@@ -310,7 +335,7 @@ RocketfuelTopologyReader::GenerateFromMapsFile (int argc, char *argv[])
           if (linkMap[nuid + ">" + uid] == 0)
             {
               NS_LOG_INFO (linksNumber << ":" << nodesNumber << " From: " << uid << " to: " << nuid);
-              link = new Link(nodeMap[uid], uid, nodeMap[nuid], nuid);
+              link = new Link(m_nodeMap[uid], uid, m_nodeMap[nuid], nuid);
 
               link->SetAttribute("From Location", loc);
               //link->SetAttribute("From Address", name);
@@ -331,6 +356,9 @@ RocketfuelTopologyReader::GenerateFromMapsFile (int argc, char *argv[])
             }
         }
     }
+
+  NS_LOG_INFO ("Rocketfuel topology created with " << m_nodesNumber << " nodes and " << m_linksNumber << " links");
+
   return nodes;
 }
 
@@ -358,20 +386,20 @@ RocketfuelTopologyReader::GenerateFromWeightsFile (int argc, char *argv[])
   // Create node and link
   if (!uid1.empty () && !uid2.empty ())
     {
-      if (nodeMap[uid1] == 0)
+      if (m_nodeMap[uid1] == 0)
         {
           Ptr<Node> tmpNode = CreateObject<Node> ();
-          nodeMap[uid1] = tmpNode;
+          m_nodeMap[uid1] = tmpNode;
           nodes.Add (tmpNode);
-          nodesNumber++;
+          m_nodesNumber++;
         }
 
-      if (nodeMap[uid2] == 0)
+      if (m_nodeMap[uid2] == 0)
         {
           Ptr<Node> tmpNode = CreateObject<Node> ();
-          nodeMap[uid2] = tmpNode;
+          m_nodeMap[uid2] = tmpNode;
           nodes.Add (tmpNode);
-          nodesNumber++;
+          m_nodesNumber++;
         }
 
       NS_LOG_INFO (linksNumber << ":" << nodesNumber << " From: " << uid1 << " (" << loc1 << ") to: " 
@@ -383,7 +411,7 @@ RocketfuelTopologyReader::GenerateFromWeightsFile (int argc, char *argv[])
           NS_LOG_INFO (linksNumber << ":" << nodesNumber << " From: " << uid1 << " (" << loc1 << ") to: " 
                        << uid2 << " (" << loc2 << ") with weight: " << weight);
 
-          Link *link = new Link(nodeMap[uid1], uid1, nodeMap[uid2], uid2);
+          Link *link = new Link(m_nodeMap[uid1], uid1, m_nodeMap[uid2], uid2);
           
           link->SetAttribute("From Location", loc1);
           link->SetAttribute("To Location", loc2);
@@ -391,9 +419,12 @@ RocketfuelTopologyReader::GenerateFromWeightsFile (int argc, char *argv[])
           
           linkMap[uid1 + ">" + uid2] = link;
           AddLink (*link);
-          linksNumber++;
+          m_linksNumber++;
         }
     }
+
+  NS_LOG_INFO ("Rocketfuel topology created with " << m_nodesNumber << " nodes and " << m_linksNumber << " links");
+
   return nodes;
 }
 
@@ -618,7 +649,6 @@ RocketfuelTopologyReader::Read (void)
 
   topgen.close ();
 
-  NS_LOG_INFO ("Rocketfuel topology created with " << nodesNumber << " nodes and " << linksNumber << " links");
   return nodes;
 }
 

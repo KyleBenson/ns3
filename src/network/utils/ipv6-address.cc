@@ -18,18 +18,43 @@
  * Author: Sebastien Vincent <vincent@clarinet.u-strasbg.fr>
  */
 
+// Part of the Ipv6Address::Print function has been adapted from inet_ntop6 Linux function.
+// See http://www.net-snmp.org/dev/agent/inet__ntop_8c_source.html
+// Author: Paul Vixie, 1996.
+// The inet_ntop6 function was under the copyright below, which is
+// compatible with GPLv2, see http://www.gnu.org/licenses/license-list.html#GPLCompatibleLicenses.
+
+/* Copyright (c) 1996 by Internet Software Consortium.
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
+ * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
+ * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+ * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+ * SOFTWARE.
+ */
+
+
 #include <iomanip>
 #include <memory.h>
 
 #include "ns3/log.h"
 #include "ns3/assert.h"
 
+#include "mac16-address.h"
 #include "mac48-address.h"
+#include "mac64-address.h"
 #include "ipv6-address.h"
 
-NS_LOG_COMPONENT_DEFINE ("Ipv6Address");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("Ipv6Address");
 
 #ifdef __cplusplus
 extern "C"
@@ -113,7 +138,12 @@ static uint32_t lookuphash (unsigned char* k, uint32_t length, uint32_t level)
 
 /**
  * \brief Convert an IPv6 C-string into a 128-bit representation.
+ *
+ * \param address pointer to the char buffer with the address ascii representation
+ * \param addr the buffer to store the IPv6 address
+ *
  * \return true if success, false otherwise (bad format, ...)
+ *
  * \note This function is strongly inspired by inet_pton6() from Paul Vixie.
  * \todo Handle IPv6 address with decimal value for last four bytes.
  */
@@ -124,7 +154,7 @@ static bool AsciiToIpv6Host (const char *address, uint8_t addr[16])
   static const char xdigits_u[] = "0123456789ABCDEF";
   unsigned char tmp[16];
   unsigned char* tp = tmp;
-  unsigned char* endp = 0;
+  unsigned char* const endp = tp + 16;
   unsigned char* colonp = 0;
   const char* xdigits = 0;
 #if 0
@@ -135,7 +165,6 @@ static bool AsciiToIpv6Host (const char *address, uint8_t addr[16])
   unsigned int val = 0;
 
   memset (tp, 0x00, 16);
-  endp = tp + 16;
 
   /* Leading :: requires some special handling. */
   if (*address == ':')
@@ -182,7 +211,7 @@ static bool AsciiToIpv6Host (const char *address, uint8_t addr[16])
               continue;
             }
 
-          if (tp + 2 > endp)
+          if (endp - tp < 2)
             {
               return (0);
             }
@@ -194,9 +223,9 @@ static bool AsciiToIpv6Host (const char *address, uint8_t addr[16])
           continue;
         }
 
-      /* TODO Handle IPv4 mapped address (2001::192.168.0.1) */
+      /* \todo Handle IPv4 mapped address (2001::192.168.0.1) */
 #if 0
-      if (ch == '.' && ((tp + 4 /*NS_INADDRSZ*/) <= endp) &&
+      if (ch == '.' && (endp - tp > 3 /* NS_INADDRSZ - 1 */)) &&
           inet_pton4 (curtok, tp) > 0)
         {
           tp += 4 /*NS_INADDRSZ*/;
@@ -209,7 +238,7 @@ static bool AsciiToIpv6Host (const char *address, uint8_t addr[16])
 
   if (seen_xdigits)
     {
-      if (tp + 2 > endp)
+      if ( endp - tp < 2)
         {
           return (0);
         }
@@ -332,6 +361,24 @@ Ipv4Address Ipv6Address::GetIpv4MappedAddress() const
     return (v4Addr);
 }
 
+Ipv6Address Ipv6Address::MakeAutoconfiguredAddress (Mac16Address addr, Ipv6Address prefix)
+{
+  NS_LOG_FUNCTION (addr << prefix);
+  Ipv6Address ret;
+  uint8_t buf[2];
+  uint8_t buf2[16];
+
+  addr.CopyTo (buf);
+  prefix.GetBytes (buf2);
+
+  memcpy (buf2 + 14, buf, 2);
+  buf2[11] = 0xff;
+  buf2[12] = 0xfe;
+
+  ret.Set (buf2);
+  return ret;
+}
+
 Ipv6Address Ipv6Address::MakeAutoconfiguredAddress (Mac48Address addr, Ipv6Address prefix)
 {
   NS_LOG_FUNCTION (addr << prefix);
@@ -347,6 +394,42 @@ Ipv6Address Ipv6Address::MakeAutoconfiguredAddress (Mac48Address addr, Ipv6Addre
   buf2[12] = 0xfe;
   memcpy (buf2 + 13, buf + 3, 3);
   buf2[8] |= 0x02;
+
+  ret.Set (buf2);
+  return ret;
+}
+
+Ipv6Address Ipv6Address::MakeAutoconfiguredAddress (Mac64Address addr, Ipv6Address prefix)
+{
+  NS_LOG_FUNCTION (addr << prefix);
+  Ipv6Address ret;
+  uint8_t buf[8];
+  uint8_t buf2[16];
+
+  addr.CopyTo (buf);
+  prefix.GetBytes (buf2);
+
+  memcpy (buf2 + 8, buf, 8);
+
+  ret.Set (buf2);
+  return ret;
+}
+
+Ipv6Address Ipv6Address::MakeAutoconfiguredLinkLocalAddress (Mac16Address addr)
+{
+  NS_LOG_FUNCTION (addr);
+  Ipv6Address ret;
+  uint8_t buf[2];
+  uint8_t buf2[16];
+
+  addr.CopyTo (buf);
+
+  memset (buf2, 0x00, sizeof (buf2));
+  buf2[0] = 0xfe;
+  buf2[1] = 0x80;
+  memcpy (buf2 + 14, buf, 2);
+  buf2[11] = 0xff;
+  buf2[12] = 0xfe;
 
   ret.Set (buf2);
   return ret;
@@ -369,6 +452,24 @@ Ipv6Address Ipv6Address::MakeAutoconfiguredLinkLocalAddress (Mac48Address addr)
   buf2[12] = 0xfe;
   memcpy (buf2 + 13, buf + 3, 3);
   buf2[8] |= 0x02;
+
+  ret.Set (buf2);
+  return ret;
+}
+
+Ipv6Address Ipv6Address::MakeAutoconfiguredLinkLocalAddress (Mac64Address addr)
+{
+  NS_LOG_FUNCTION (addr);
+  Ipv6Address ret;
+  uint8_t buf[8];
+  uint8_t buf2[16];
+
+  addr.CopyTo (buf);
+
+  memset (buf2, 0x00, sizeof (buf2));
+  buf2[0] = 0xfe;
+  buf2[1] = 0x80;
+  memcpy (buf2 + 8, buf, 8);
 
   ret.Set (buf2);
   return ret;
@@ -399,23 +500,96 @@ Ipv6Address Ipv6Address::MakeSolicitedAddress (Ipv6Address addr)
 void Ipv6Address::Print (std::ostream& os) const
 {
   NS_LOG_FUNCTION (this << &os);
-  os << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[0]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[1] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[2]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[3] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[4]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[5] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[6]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[7] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[8]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[9] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[10]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[11] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[12]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[13] << ":"
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[14]
-     << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_address[15]
-     << std::dec << std::setfill (' ');
+
+  // note: part of this function has been adapted from inet_ntop6 Linux function.
+  // See http://www.net-snmp.org/dev/agent/inet__ntop_8c_source.html
+  // Author: Paul Vixie, 1996.
+
+  if (IsIpv4MappedAddress ())
+    {
+      os << "::ffff:"
+         << (unsigned int) m_address[12] << "."
+         << (unsigned int) m_address[13] << "."
+         << (unsigned int) m_address[14] << "."
+         << (unsigned int) m_address[15];
+      return;
+    }
+
+  uint16_t address[8];
+  uint8_t i;
+
+  for (i=0; i<8; i++)
+    {
+      address[i] = (uint16_t(m_address[2*i]) << 8) | uint16_t(m_address[2*i+1]);
+    }
+
+  int8_t bestBase = -1;
+  int8_t bestLen = 0;
+  int8_t curBase = -1;
+  int8_t curLen = 0;
+
+  for (i=0; i<8; i++)
+    {
+      if (address[i] == 0)
+        {
+          if (curBase == -1)
+            {
+              curBase = i;
+              curLen = 1;
+            }
+          else
+            {
+              curLen++;
+            }
+        }
+      else
+        {
+          if (curBase != -1)
+            {
+              if (bestBase == -1 || curLen > bestLen)
+                {
+                  bestBase = curBase;
+                  bestLen = curLen;
+                }
+              curBase = -1;
+            }
+        }
+    }
+  if (curBase != -1)
+    {
+      if (bestBase == -1 || curLen > bestLen)
+        {
+          bestBase = curBase;
+          bestLen = curLen;
+        }
+    }
+  if (bestBase != -1 && bestLen < 2)
+    {
+      bestBase = -1;
+    }
+
+  for (i = 0; i < 8;) {
+      // Are we inside the best run of 0x00's?
+      if (i == bestBase)
+        {
+          os << ':';
+          i += bestLen;
+          continue;
+        }
+      // Are we following an initial run of 0x00s or any real hex?
+      if (i != 0)
+        {
+          os << ':';
+        }
+      os << std::hex << (unsigned int) address[i];
+      i++;
+  }
+  // Was it a trailing run of 0x00's?
+  if (bestBase != -1 && (bestBase + bestLen) == 8)
+    {
+      os << ':';
+    }
+  os << std::dec;
 }
 
 bool Ipv6Address::IsLocalhost () const
@@ -445,7 +619,7 @@ bool Ipv6Address::IsLinkLocalMulticast () const
   return false;
 }
 
-bool Ipv6Address::IsIpv4MappedAddress ()
+bool Ipv6Address::IsIpv4MappedAddress () const
 {
   NS_LOG_FUNCTION (this);
   uint8_t v4MappedPrefix[12] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -521,6 +695,19 @@ bool Ipv6Address::IsAny () const
   static Ipv6Address any ("::");
   return (*this == any);
 }
+
+
+bool Ipv6Address::IsDocumentation () const
+{
+  NS_LOG_FUNCTION (this);
+  Ipv6Address documentation ("2001:db8::0");
+  if (((Ipv6Address*)this)->CombinePrefix (Ipv6Prefix (32)) == documentation)
+    {
+      return true;
+    }
+  return false;
+}
+
 
 bool Ipv6Address::IsMatchingType (const Address& address)
 {
@@ -740,22 +927,8 @@ bool Ipv6Prefix::IsMatch (Ipv6Address a, Ipv6Address b) const
 void Ipv6Prefix::Print (std::ostream &os) const
 {
   NS_LOG_FUNCTION (this << &os);
-  os << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[0]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[1] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[2]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[3] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[4]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[5] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[6]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[7] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[8]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[9] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[10]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[11] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[12]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[13] << ":"
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[14]
-  << std::hex << std::setw (2) << std::setfill ('0') << (unsigned int) m_prefix[15];
+
+  os << "/" << (unsigned int) GetPrefixLength();
 }
 
 Ipv6Prefix Ipv6Prefix::GetLoopback ()
@@ -826,16 +999,6 @@ std::istream& operator >> (std::istream& is, Ipv6Prefix& prefix)
   is >> str;
   prefix = Ipv6Prefix (str.c_str ());
   return is;
-}
-
-bool operator == (Ipv6Prefix const &a, Ipv6Prefix const &b)
-{
-  return a.IsEqual (b);
-}
-
-bool operator != (Ipv6Prefix const &a, Ipv6Prefix const &b)
-{
-  return !a.IsEqual (b);
 }
 
 size_t Ipv6AddressHash::operator () (Ipv6Address const &x) const

@@ -33,8 +33,17 @@ class FfMacCschedSapUser;
 class FfMacSchedSapUser;
 class FfMacCschedSapProvider;
 class FfMacSchedSapProvider;
+class LteFfrSapProvider;
+class LteFfrSapUser;
 
 /**
+ * \ingroup lte
+ * \defgroup ff-api FF MAC Schedulers
+ */
+     
+/**
+ * \ingroup ff-api
+ *
  * This abstract base class identifies the interface by means of which
  * the helper object can plug on the MAC a scheduler implementation based on the
  * FF MAC Sched API.
@@ -99,6 +108,21 @@ public:
    */
   virtual FfMacSchedSapProvider* GetFfMacSchedSapProvider () = 0;
 
+  //FFR SAPs
+  /**
+   *
+   * Set the Provider part of the LteFfrSap that this Scheduler will
+   * interact with
+   *
+   * \param s
+   */
+  virtual void SetLteFfrSapProvider (LteFfrSapProvider* s) = 0;
+
+  /**
+   *
+   * \return the User part of the LteFfrSap provided by the FfrAlgorithm
+   */
+  virtual LteFfrSapUser* GetLteFfrSapUser () = 0;
   
 protected:
     

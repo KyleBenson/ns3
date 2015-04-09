@@ -29,7 +29,7 @@
 #include <iostream>
 #include <fstream>
 
-namespace ns3 {
+using namespace ns3;
 
 class BriteTopologyStructureTestCase : public TestCase
 {
@@ -192,9 +192,7 @@ class BriteTestSuite : public TestSuite
 public:
   BriteTestSuite () : TestSuite ("brite-testing", UNIT)
   {
-    AddTestCase (new BriteTopologyStructureTestCase);
-    AddTestCase (new BriteTopologyFunctionTestCase);
+    AddTestCase (new BriteTopologyStructureTestCase, TestCase::QUICK);
+    AddTestCase (new BriteTopologyFunctionTestCase, TestCase::QUICK);
   }
 } g_briteTestSuite;
-
-} // namespace ns3

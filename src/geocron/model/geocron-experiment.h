@@ -18,6 +18,7 @@
 #include "ns3/point-to-point-module.h"
 #include "ns3/network-module.h"
 #include "ns3/mobility-module.h"
+#include "ns3/random-variable-stream.h"
 
 #include "ron-header.h"
 #include "ron-helper.h"
@@ -127,7 +128,7 @@ private:
   Time appStopTime;
 
   // Random variable for determining if links fail during the disaster
-  UniformVariable random;
+  Ptr<UniformRandomVariable> random;
 
   // These maps, indexed by disaster location name, hold nodes of interest for the associated disaster region
   std::map<Location, std::map<uint32_t, Ptr <Node> > > disasterNodes; //both random access AND iteration hmmm...

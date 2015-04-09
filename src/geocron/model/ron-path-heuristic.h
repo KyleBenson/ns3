@@ -20,6 +20,7 @@
 #define RON_PATH_HEURISTIC_H
 
 #include "ns3/core-module.h"
+#include "ns3/random-variable-stream.h"
 
 #include "ron-peer-table.h"
 #include "ron-path.h"
@@ -154,7 +155,7 @@ public:
       Set this to true to avoid clearing LHs after each newly chosen peer. */
   bool m_updatedOnce;
   Ptr<RonPeerTable> m_peers;
-  UniformVariable random; //for random decisions
+  Ptr<UniformRandomVariable> m_random; //for random decisions
   Ptr<RonPeerEntry> m_source;
   std::string m_summaryName;
   std::string m_shortName;

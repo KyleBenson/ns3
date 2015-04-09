@@ -35,10 +35,9 @@
 #include <ns3/lte-control-messages.h>
 #include "ns3/lte-helper.h"
 
+using namespace ns3;
+
 NS_LOG_COMPONENT_DEFINE ("LteDownlinkSinrTest");
-
-namespace ns3 {
-
 
 /**
  * Test 1.1 SINR calculation in downlink
@@ -82,8 +81,8 @@ LteDownlinkSinrTestSuite::LteDownlinkSinrTestSuite ()
   (*theoreticalSinr1)[0] = 3.72589167251055;
   (*theoreticalSinr1)[1] = 3.72255684126076;
 
-  AddTestCase (new LteDownlinkDataSinrTestCase (rxPsd1, theoreticalSinr1, "sdBm = [-46 -48]"));
-  AddTestCase (new LteDownlinkCtrlSinrTestCase (rxPsd1, theoreticalSinr1, "sdBm = [-46 -48]"));
+  AddTestCase (new LteDownlinkDataSinrTestCase (rxPsd1, theoreticalSinr1, "sdBm = [-46 -48]"), TestCase::QUICK);
+  AddTestCase (new LteDownlinkCtrlSinrTestCase (rxPsd1, theoreticalSinr1, "sdBm = [-46 -48]"), TestCase::QUICK);
 
   /**
    * TX signal #2: Power Spectral Density (W/Hz) of the signal of interest = [-63 -61] dBm and BW = [20 22] MHz
@@ -96,8 +95,8 @@ LteDownlinkSinrTestSuite::LteDownlinkSinrTestSuite ()
   (*theoreticalSinr2)[0] = 0.0743413124381667;
   (*theoreticalSinr2)[1] = 0.1865697965291756;
 
-  AddTestCase (new LteDownlinkDataSinrTestCase (rxPsd2, theoreticalSinr2, "sdBm = [-63 -61]"));
-  AddTestCase (new LteDownlinkCtrlSinrTestCase (rxPsd2, theoreticalSinr2, "sdBm = [-63 -61]"));
+  AddTestCase (new LteDownlinkDataSinrTestCase (rxPsd2, theoreticalSinr2, "sdBm = [-63 -61]"), TestCase::QUICK);
+  AddTestCase (new LteDownlinkCtrlSinrTestCase (rxPsd2, theoreticalSinr2, "sdBm = [-63 -61]"), TestCase::QUICK);
   
 
 }
@@ -136,7 +135,7 @@ LteDownlinkDataSinrTestCase::DoRun (void)
   dlPhy->SetCellId (cellId);
   ulPhy->SetCellId (cellId);
 
-  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> (uePhy->GetObject<LtePhy> ());
+  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> ();
   dlPhy->AddDataSinrChunkProcessor (chunkProcessor);
 
   /**
@@ -262,7 +261,7 @@ LteDownlinkDataSinrTestCase::DoRun (void)
   Simulator::Run ();
 
   /**
-   * Check that the values passed to LteSinrChunkProcessor::EvaluateSinrChunk () correspond
+   * Check that the values passed to LteChunkProcessor::EvaluateChunk () correspond
    * to known values which have been calculated offline (with octave) for the generated signals
    */
   Ptr<SpectrumValue> calculatedSinr = chunkProcessor->GetSinr ();
@@ -308,7 +307,7 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   dlPhy->SetCellId (cellId);
   ulPhy->SetCellId (cellId);
   
-  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> (uePhy->GetObject<LtePhy> ());
+  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> ();
   dlPhy->AddCtrlSinrChunkProcessor (chunkProcessor);
   
   /**
@@ -390,6 +389,7 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   sp1->duration = ds;
   sp1->ctrlMsgList = ctrlMsgList[0];
   sp1->cellId = pbCellId[0];
+  sp1->pss = false;
   Simulator::Schedule (ts, &LteSpectrumPhy::StartRx, dlPhy, sp1);
   
   
@@ -399,6 +399,7 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   ip1->duration = di1;
   ip1->ctrlMsgList = ctrlMsgList[1];
   ip1->cellId = pbCellId[1];
+  ip1->pss = false;
   Simulator::Schedule (ti1, &LteSpectrumPhy::StartRx, dlPhy, ip1);
   
   Ptr<LteSpectrumSignalParametersDlCtrlFrame> ip2 = Create<LteSpectrumSignalParametersDlCtrlFrame> ();
@@ -407,6 +408,7 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   ip2->duration = di2;
   ip2->ctrlMsgList = ctrlMsgList[2];
   ip2->cellId = pbCellId[2];
+  ip2->pss = false;
   Simulator::Schedule (ti2, &LteSpectrumPhy::StartRx, dlPhy, ip2);
   
   Ptr<LteSpectrumSignalParametersDlCtrlFrame> ip3 = Create<LteSpectrumSignalParametersDlCtrlFrame> ();
@@ -415,6 +417,7 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   ip3->duration = di3;
   ip3->ctrlMsgList = ctrlMsgList[3];
   ip3->cellId = pbCellId[3];
+  ip3->pss = false;
   Simulator::Schedule (ti3, &LteSpectrumPhy::StartRx, dlPhy, ip3);
   
   Ptr<LteSpectrumSignalParametersDlCtrlFrame> ip4 = Create<LteSpectrumSignalParametersDlCtrlFrame> ();
@@ -423,13 +426,14 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   ip4->duration = di4;
   ip4->ctrlMsgList = ctrlMsgList[4];
   ip4->cellId = pbCellId[4];
+  ip4->pss = false;
   Simulator::Schedule (ti4, &LteSpectrumPhy::StartRx, dlPhy, ip4);
   
   Simulator::Stop (Seconds (5.0));
   Simulator::Run ();
   
   /**
-  * Check that the values passed to LteSinrChunkProcessor::EvaluateSinrChunk () correspond
+  * Check that the values passed to LteChunkProcessor::EvaluateChunk () correspond
   * to known values which have been calculated offline (with octave) for the generated signals
   */
   Ptr<SpectrumValue> calculatedSinr = chunkProcessor->GetSinr ();
@@ -441,6 +445,3 @@ LteDownlinkCtrlSinrTestCase::DoRun (void)
   dlPhy->Dispose ();
   Simulator::Destroy ();
 }
-
-
-} // namespace

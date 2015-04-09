@@ -42,7 +42,6 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("TopologyCreationExperiment");
 
-
 static std::list<unsigned int> data;
 
 static void SinkRx (Ptr<const Packet> p, const Address &ad)
@@ -76,15 +75,12 @@ int main (int argc, char *argv[])
   // --------------------------------------------
 
   // Pick a topology reader based in the requested format.
-
-  Ptr<TopologyReader> inFile = 0;
   TopologyReaderHelper topoHelp;
-
-  NodeContainer nodes;
-
   topoHelp.SetFileName (input);
   topoHelp.SetFileType (format);
-  inFile = topoHelp.GetTopologyReader ();
+  Ptr<TopologyReader> inFile = topoHelp.GetTopologyReader ();
+
+  NodeContainer nodes;
 
   if (inFile != 0)
     {

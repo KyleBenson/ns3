@@ -36,13 +36,15 @@ default_fprobs=["0.1",
                 "0.5",
                 #"0.6"
                 ]
-default_disasters = {}
-default_disasters['1755']='"Amsterdam,_Netherlands-London,_UnitedKingdom-Paris,_France"'
-default_disasters['3967']='"Herndon,_VA-Irvine,_CA-Santa_Clara,_CA"'
-default_disasters['6461']='"San_Jose,_CA-Los_Angeles,_CA-New_York,_NY"'
-default_disasters['3356']='"New_York,_NY-Los_Angeles,_CA-Miami,_FL"'
-default_disasters['2914']='"New_York,_NY-Irvine,_CA"' #New_Orleans,_LA-
-default_disasters['1239']='"New_York,_NY-Dallas,_TX-Washington,_DC"'
+#TODO: make this configurable for BRITE topology...
+default_disasters = {'3356' : '0,0'}
+#default_disasters = {}
+#default_disasters['1755']='"Amsterdam,_Netherlands-London,_UnitedKingdom-Paris,_France"'
+#default_disasters['3967']='"Herndon,_VA-Irvine,_CA-Santa_Clara,_CA"'
+#default_disasters['6461']='"San_Jose,_CA-Los_Angeles,_CA-New_York,_NY"'
+#default_disasters['3356']='"New_York,_NY-Los_Angeles,_CA-Miami,_FL"'
+#default_disasters['2914']='"New_York,_NY-Irvine,_CA"' #New_Orleans,_LA-
+#default_disasters['1239']='"New_York,_NY-Dallas,_TX-Washington,_DC"'
 default_verbosity_level=0
 
 def parse_args(args):
@@ -106,7 +108,7 @@ def parse_args(args):
     parser.add_argument('--test', '-t', action="store_true",
                         help='''simulator will only run once in a single process, then exit''')
     parser.add_argument('--no-email', '-ne', action="store_true", dest='no_email',
-                        help='''simulator will only run once in a single process, then exit''')
+                        help='''simulator will by default email you when finished; this disables that feature''')
 
     args = parser.parse_args(args)
 
@@ -189,9 +191,9 @@ def makecmds(args):
 
             #TODO: brite topologies too
             #cmd += '--file=rocketfuel/maps/%s.cch ' % topology
-            
+
             # instead, this hack lets us put the different runs in the same directory,
-            # but separate different processes since they will have different topologies 
+            # but separate different processes since they will have different topologies
             cmd += '--file=%s ' % i
 
             cmd += '--fail_prob=%s ' % fprobs
@@ -219,7 +221,7 @@ def makecmds(args):
 
 # Main
 if __name__ == "__main__":
-    
+
     import sys, os, subprocess, signal
 
     args = parse_args(sys.argv[1:])
@@ -236,14 +238,14 @@ if __name__ == "__main__":
         exit(1) #error building
 
     children = []
-    for cmd in makecmds(args):    
+    for cmd in makecmds(args):
         if args.verbose:
             print(cmd)
         if args.show_cmd:
             exit(0)
 
         children.append(subprocess.Popen(cmd, shell=True))
-        
+
     def __sigint_handler(sig, frame):
         '''Called when user presses Ctrl-C to kill whole process.  Kills all children.'''
         for c in children:
@@ -259,7 +261,7 @@ if __name__ == "__main__":
 
     if not args.no_email:
         subprocess.call('ssmtp kyle.edward.benson@gmail.com < done_sims.email', shell=True)
-        #TODO: add stuff to email: time, 
+        #TODO: add stuff to email: time,
 
     #if args.optimized:
       #  subprocess.call("./waf configure --enable-examples --enable-tests", shell=True)

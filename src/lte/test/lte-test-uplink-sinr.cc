@@ -35,10 +35,9 @@
 
 #include <ns3/lte-helper.h>
 
+using namespace ns3;
+
 NS_LOG_COMPONENT_DEFINE ("LteUplinkSinrTest");
-
-namespace ns3 {
-
 
 /**
  * Test 1.2 SINR calculation in uplink
@@ -85,9 +84,9 @@ LteUplinkSinrTestSuite::LteUplinkSinrTestSuite ()
   (*theoreticalSinr1)[0] = 3.72589167251055;
   (*theoreticalSinr1)[1] = 3.72255684126076;
 
-  AddTestCase (new LteUplinkDataSinrTestCase (rxPsd1, rxPsd2, theoreticalSinr1, "sdBm = [-46 -inf] and [-inf -48]"));
+  AddTestCase (new LteUplinkDataSinrTestCase (rxPsd1, rxPsd2, theoreticalSinr1, "sdBm = [-46 -inf] and [-inf -48]"), TestCase::QUICK);
   
-  AddTestCase (new LteUplinkSrsSinrTestCase (rxPsd1, rxPsd2, theoreticalSinr1, "sdBm = [-46 -inf] and [-inf -48]"));
+  AddTestCase (new LteUplinkSrsSinrTestCase (rxPsd1, rxPsd2, theoreticalSinr1, "sdBm = [-46 -inf] and [-inf -48]"), TestCase::QUICK);
 
   /**
    * TX signals #2: Power Spectral Density of the signals of interest = [-63 -inf] and [-inf -61] dBm and BW = [20 22] MHz
@@ -104,9 +103,9 @@ LteUplinkSinrTestSuite::LteUplinkSinrTestSuite ()
   (*theoreticalSinr2)[0] = 0.0743413124381667;
   (*theoreticalSinr2)[1] = 0.1865697965291756;
 
-  AddTestCase (new LteUplinkDataSinrTestCase (rxPsd3, rxPsd4, theoreticalSinr2, "sdBm = [-63 -inf] and [-inf -61]"));
+  AddTestCase (new LteUplinkDataSinrTestCase (rxPsd3, rxPsd4, theoreticalSinr2, "sdBm = [-63 -inf] and [-inf -61]"), TestCase::QUICK);
   
-  AddTestCase (new LteUplinkSrsSinrTestCase (rxPsd3, rxPsd4, theoreticalSinr2, "sdBm = [-63 -inf] and [-inf -61]"));
+  AddTestCase (new LteUplinkSrsSinrTestCase (rxPsd3, rxPsd4, theoreticalSinr2, "sdBm = [-63 -inf] and [-inf -61]"), TestCase::QUICK);
 
 }
 
@@ -144,7 +143,7 @@ LteUplinkDataSinrTestCase::DoRun (void)
   dlPhy->SetCellId (cellId);
   ulPhy->SetCellId (cellId);
 
-  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> (uePhy->GetObject<LtePhy> ());
+  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> ();
   ulPhy->AddDataSinrChunkProcessor (chunkProcessor);
 
   /**
@@ -296,7 +295,7 @@ LteUplinkDataSinrTestCase::DoRun (void)
   Simulator::Run ();
 
   /**
-   * Check that the values passed to LteSinrChunkProcessor::EvaluateSinrChunk () correspond
+   * Check that the values passed to LteChunkProcessor::EvaluateChunk () correspond
    * to known values which have been calculated offline (with octave) for the generated signals
    */
   Ptr<SpectrumValue> calculatedSinr = chunkProcessor->GetSinr ();
@@ -337,7 +336,7 @@ LteUplinkSrsSinrTestCase::DoRun (void)
   */
   
   Ptr<LteHelper> lteHelper = CreateObject<LteHelper> ();
-  lteHelper->EnableLogComponents ();
+  // lteHelper->EnableLogComponents ();
   Ptr<LteSpectrumPhy> dlPhy = CreateObject<LteSpectrumPhy> ();
   Ptr<LteSpectrumPhy> ulPhy = CreateObject<LteSpectrumPhy> ();
   Ptr<LteTestUePhy> uePhy = CreateObject<LteTestUePhy> (dlPhy, ulPhy);
@@ -345,7 +344,7 @@ LteUplinkSrsSinrTestCase::DoRun (void)
   dlPhy->SetCellId (cellId);
   ulPhy->SetCellId (cellId);
   
-  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> (uePhy->GetObject<LtePhy> ());
+  Ptr<LteTestSinrChunkProcessor> chunkProcessor = Create<LteTestSinrChunkProcessor> ();
   ulPhy->AddCtrlSinrChunkProcessor (chunkProcessor);
   
   /**
@@ -466,7 +465,7 @@ LteUplinkSrsSinrTestCase::DoRun (void)
   Simulator::Run ();
   
   /**
-  * Check that the values passed to LteSinrChunkProcessor::EvaluateSinrChunk () correspond
+  * Check that the values passed to LteChunkProcessor::EvaluateChunk () correspond
   * to known values which have been calculated offline (with octave) for the generated signals
   */
   Ptr<SpectrumValue> calculatedSinr = chunkProcessor->GetSinr ();
@@ -479,5 +478,3 @@ LteUplinkSrsSinrTestCase::DoRun (void)
   Simulator::Destroy ();
   
 }
-
-} //namespace

@@ -22,6 +22,7 @@
 #include "ns3/log.h"
 #include "ns3/string.h"
 #include "ns3/double.h"
+#include "ns3/boolean.h"
 #include <ns3/enum.h>
 
 #include "ns3/mobility-helper.h"
@@ -34,10 +35,9 @@
 
 #include "lte-test-sinr-chunk-processor.h"
 
+using namespace ns3;
+
 NS_LOG_COMPONENT_DEFINE ("LteLinkAdaptationTest");
-
-namespace ns3 {
-
 
 /**
  * Test 1.3 Link Adaptation
@@ -123,7 +123,7 @@ LteLinkAdaptationTestSuite::LteLinkAdaptationTestSuite ()
       std::ostringstream name;
       name << " snr= " << snrEfficiencyMcs[i].snrDb << " dB, "
            << " mcs= " << snrEfficiencyMcs[i].mcsIndex;
-      AddTestCase (new LteLinkAdaptationTestCase (name.str (),  snrEfficiencyMcs[i].snrDb, lossDb, snrEfficiencyMcs[i].mcsIndex));
+      AddTestCase (new LteLinkAdaptationTestCase (name.str (),  snrEfficiencyMcs[i].snrDb, lossDb, snrEfficiencyMcs[i].mcsIndex), TestCase::QUICK);
     }
 
 }
@@ -155,9 +155,15 @@ LteLinkAdaptationTestCase::~LteLinkAdaptationTestCase ()
 void
 LteLinkAdaptationTestCase::DoRun (void)
 {
-  
+  Config::Reset ();
   Config::SetDefault ("ns3::LteAmc::AmcModel", EnumValue (LteAmc::PiroEW2010));
   Config::SetDefault ("ns3::LteAmc::Ber", DoubleValue (0.00005));
+  Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (2));
+  Config::SetDefault ("ns3::LteHelper::UseIdealRrc", BooleanValue (true));
+
+  //Disable Uplink Power Control
+  Config::SetDefault ("ns3::LteUePhy::EnableUplinkPowerControl", BooleanValue (false));
+
   /**
     * Simulation Topology
     */
@@ -195,18 +201,18 @@ LteLinkAdaptationTestCase::DoRun (void)
   // Activate the default EPS bearer
   enum EpsBearer::Qci q = EpsBearer::NGBR_VIDEO_TCP_DEFAULT;
   EpsBearer bearer (q);
-  lteHelper->ActivateEpsBearer (ueDevs, bearer, EpcTft::Default ());
+  lteHelper->ActivateDataRadioBearer (ueDevs, bearer);
 
   // Use testing chunk processor in the PHY layer
   // It will be used to test that the SNR is as intended
   Ptr<LtePhy> uePhy = ueDevs.Get (0)->GetObject<LteUeNetDevice> ()->GetPhy ()->GetObject<LtePhy> ();
-  Ptr<LteTestSinrChunkProcessor> testSinr = Create<LteTestSinrChunkProcessor> (uePhy);
-  uePhy->GetDownlinkSpectrumPhy ()->AddDataSinrChunkProcessor (testSinr);
+  Ptr<LteTestSinrChunkProcessor> testSinr = Create<LteTestSinrChunkProcessor> ();
+  uePhy->GetDownlinkSpectrumPhy ()->AddCtrlSinrChunkProcessor (testSinr);
 
   Config::Connect ("/NodeList/0/DeviceList/0/LteEnbMac/DlScheduling",
                    MakeBoundCallback (&LteTestDlSchedulingCallback, this));
 
-  Simulator::Stop (Seconds (0.007));
+  Simulator::Stop (Seconds (0.040));
   Simulator::Run ();
 
   double calculatedSinrDb = 10.0 * std::log10 (testSinr->GetSinr ()->operator[] (0));
@@ -229,16 +235,14 @@ LteLinkAdaptationTestCase::DlScheduling (uint32_t frameNo, uint32_t subframeNo, 
 
   /**
    * Note:
-   *    For first 4 subframeNo in the first frameNo, the MCS cannot be properly evaluated,
-   *    because CQI feedback is still not available at the eNB.
+   * the MCS can only be properly evaluated after:
+   * RRC connection has been completed and
+   * CQI feedback is available at the eNB.
    */
-  if ( (frameNo > 1) || (subframeNo > 8) )
+  if (Simulator::Now ().GetSeconds () > 0.030)
     {
       NS_LOG_INFO (m_snrDb << "\t" << m_mcsIndex << "\t" << (uint16_t)mcsTb1);
 
       NS_TEST_ASSERT_MSG_EQ ((uint16_t)mcsTb1, m_mcsIndex, "Wrong MCS index");
     }
 }
-
-} // namespace ns3
-

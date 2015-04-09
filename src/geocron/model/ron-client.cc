@@ -29,7 +29,7 @@
 #include "ns3/trace-source-accessor.h"
 #include "ns3/uinteger.h"
 #include "ns3/ipv4.h"
-#include "ns3/random-variable.h"
+#include "ns3/object.h" //for schedulign Initialize() method
 
 #include "ron-trace-functions.h"
 #include "ron-client.h"
@@ -39,8 +39,6 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("RonClientApplication");
 NS_OBJECT_ENSURE_REGISTERED (RonClient);
 
- 
-static UniformVariable random;  //for picking overlay nodes
 
 TypeId
 RonClient::GetTypeId (void)
@@ -119,7 +117,7 @@ RonClient::DoReset ()
   // Reschedule start so that StartApplication gets rescheduled
   // WARNING: was ScheduleWithContext (GetId (), args...) for in a node
   Simulator::Schedule (Seconds (0.0), 
-                       &Application::Start, this);
+                       &Application::Initialize, this);
 
   //Ipv4Address m_servAddress; //HANDLE SETTING!!
   CancelEvents ();

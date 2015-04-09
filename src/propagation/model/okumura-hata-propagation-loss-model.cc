@@ -27,9 +27,9 @@
 
 #include "okumura-hata-propagation-loss-model.h"
 
-NS_LOG_COMPONENT_DEFINE ("OkumuraHataPropagationLossModel");
-
 namespace ns3 {
+
+NS_LOG_COMPONENT_DEFINE ("OkumuraHataPropagationLossModel");
 
 NS_OBJECT_ENSURE_REGISTERED (OkumuraHataPropagationLossModel);
 
@@ -40,6 +40,7 @@ OkumuraHataPropagationLossModel::GetTypeId (void)
   static TypeId tid = TypeId ("ns3::OkumuraHataPropagationLossModel")
 
     .SetParent<PropagationLossModel> ()
+    .AddConstructor<OkumuraHataPropagationLossModel> ()
 
     .AddAttribute ("Frequency",
                    "The propagation frequency in Hz",
@@ -66,6 +67,15 @@ OkumuraHataPropagationLossModel::GetTypeId (void)
   return tid;
 }
 
+OkumuraHataPropagationLossModel::OkumuraHataPropagationLossModel ()
+  : PropagationLossModel ()
+{
+}
+
+OkumuraHataPropagationLossModel::~OkumuraHataPropagationLossModel ()
+{
+}
+
 double
 OkumuraHataPropagationLossModel::GetLoss (Ptr<MobilityModel> a, Ptr<MobilityModel> b) const
 {
@@ -84,7 +94,7 @@ OkumuraHataPropagationLossModel::GetLoss (Ptr<MobilityModel> a, Ptr<MobilityMode
       double log_bHeight = 0.0;
       if (m_citySize == LargeCity)
         {
-          if (m_frequency < 200)
+          if (fmhz < 200)
             {
               log_bHeight = 8.29 * std::pow (log10 (1.54 * hm), 2) -  1.1;
             }

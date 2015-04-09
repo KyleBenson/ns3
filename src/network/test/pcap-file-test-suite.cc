@@ -22,10 +22,13 @@
 #include <sstream>
 #include <cstring>
 
+#include "ns3/log.h"
 #include "ns3/test.h"
 #include "ns3/pcap-file.h"
 
 using namespace ns3;
+
+NS_LOG_COMPONENT_DEFINE ("pcap-file-test-suite");
 
 // ===========================================================================
 // Some utility functions for the tests.
@@ -113,7 +116,10 @@ WriteModeCreateTestCase::DoSetup (void)
 void
 WriteModeCreateTestCase::DoTeardown (void)
 {
-  remove (m_testFilename.c_str ());
+  if (remove (m_testFilename.c_str ()))
+    {
+      NS_LOG_ERROR ("Failed to delete file " << m_testFilename);
+    }
 }
 
 void
@@ -225,7 +231,10 @@ ReadModeCreateTestCase::DoSetup (void)
 void
 ReadModeCreateTestCase::DoTeardown (void)
 {
-  remove (m_testFilename.c_str ());
+  if (remove (m_testFilename.c_str ()))
+    {
+      NS_LOG_ERROR ("Failed to delete file " << m_testFilename);
+    }
 }
 
 void
@@ -331,7 +340,10 @@ AppendModeCreateTestCase::DoSetup (void)
 void
 AppendModeCreateTestCase::DoTeardown (void)
 {
-  remove (m_testFilename.c_str ());
+  if (remove (m_testFilename.c_str ()))
+    {
+      NS_LOG_ERROR ("Failed to delete file " << m_testFilename);
+    }
 }
 
 void
@@ -437,7 +449,10 @@ FileHeaderTestCase::DoSetup (void)
 void
 FileHeaderTestCase::DoTeardown (void)
 {
-  remove (m_testFilename.c_str ());
+  if (remove (m_testFilename.c_str ()))
+    {
+      NS_LOG_ERROR ("Failed to delete file " << m_testFilename);
+    }
 }
 
 void
@@ -674,7 +689,10 @@ RecordHeaderTestCase::DoSetup (void)
 void
 RecordHeaderTestCase::DoTeardown (void)
 {
-  remove (m_testFilename.c_str ());
+  if (remove (m_testFilename.c_str ()))
+    {
+      NS_LOG_ERROR ("Failed to delete file " << m_testFilename);
+    }
 }
 
 void
@@ -876,7 +894,8 @@ RecordHeaderTestCase::DoRun (void)
   // starting there in the file.  We've tested this all before so we just assume
   // it's all right and just seek past it.
   //
-  std::fseek (p, 24, SEEK_SET);
+  result = std::fseek (p, 24, SEEK_SET);
+  NS_TEST_ASSERT_MSG_EQ (result, 0, "Failed seeking past pcap header");
 
   result = std::fread (&val32, sizeof(val32), 1, p);
   NS_TEST_ASSERT_MSG_EQ (result, 1, "Unable to fread() seconds timestamp");
@@ -974,8 +993,8 @@ ReadFileTestCase::DoTeardown (void)
 {
 }
 
-const uint32_t N_KNOWN_PACKETS = 6;
-const uint32_t N_PACKET_BYTES = 16;
+static const uint32_t N_KNOWN_PACKETS = 6;
+static const uint32_t N_PACKET_BYTES = 16;
 
 typedef struct PACKET_ENTRY {
   uint32_t tsSec;
@@ -985,7 +1004,7 @@ typedef struct PACKET_ENTRY {
   uint16_t data[N_PACKET_BYTES];
 } PacketEntry;
 
-PacketEntry knownPackets[] = {
+static const PacketEntry knownPackets[] = {
   { 2, 3696,   46,   46, { 0x0001, 0x0800, 0x0604, 0x0001, 0x0000, 0x0000, 0x0003, 0x0a01,
                            0x0201, 0xffff, 0xffff, 0xffff, 0x0a01, 0x0204, 0x0000, 0x0000}},
   { 2, 3707,   46,   46, { 0x0001, 0x0800, 0x0604, 0x0002, 0x0000, 0x0000, 0x0006, 0x0a01,
@@ -1024,16 +1043,16 @@ ReadFileTestCase::DoRun (void)
   uint8_t data[N_PACKET_BYTES];
   uint32_t tsSec, tsUsec, inclLen, origLen, readLen;
 
-  PacketEntry *p = knownPackets;
-
-  for (uint32_t i = 0; i < N_KNOWN_PACKETS; ++i, ++p)
+  for (uint32_t i = 0; i < N_KNOWN_PACKETS; ++i)
     {
+      PacketEntry const & p = knownPackets[i];
+
       f.Read (data, sizeof(data), tsSec, tsUsec, inclLen, origLen, readLen);
       NS_TEST_ASSERT_MSG_EQ (f.Fail (), false, "Read() of known good pcap file returns error");
-      NS_TEST_ASSERT_MSG_EQ (tsSec, p->tsSec, "Incorrectly read seconds timestap from known good pcap file");
-      NS_TEST_ASSERT_MSG_EQ (tsUsec, p->tsUsec, "Incorrectly read microseconds timestap from known good pcap file");
-      NS_TEST_ASSERT_MSG_EQ (inclLen, p->inclLen, "Incorrectly read included length from known good packet");
-      NS_TEST_ASSERT_MSG_EQ (origLen, p->origLen, "Incorrectly read original length from known good packet");
+      NS_TEST_ASSERT_MSG_EQ (tsSec, p.tsSec, "Incorrectly read seconds timestap from known good pcap file");
+      NS_TEST_ASSERT_MSG_EQ (tsUsec, p.tsUsec, "Incorrectly read microseconds timestap from known good pcap file");
+      NS_TEST_ASSERT_MSG_EQ (inclLen, p.inclLen, "Incorrectly read included length from known good packet");
+      NS_TEST_ASSERT_MSG_EQ (origLen, p.origLen, "Incorrectly read original length from known good packet");
       NS_TEST_ASSERT_MSG_EQ (readLen, N_PACKET_BYTES, "Incorrect actual read length from known good packet given buffer size");
     }
 
@@ -1111,13 +1130,13 @@ PcapFileTestSuite::PcapFileTestSuite ()
   : TestSuite ("pcap-file", UNIT)
 {
   SetDataDir (NS_TEST_SOURCEDIR);
-  AddTestCase (new WriteModeCreateTestCase);
-  AddTestCase (new ReadModeCreateTestCase);
-  //AddTestCase (new AppendModeCreateTestCase);
-  AddTestCase (new FileHeaderTestCase);
-  AddTestCase (new RecordHeaderTestCase);
-  AddTestCase (new ReadFileTestCase);
-  AddTestCase (new DiffTestCase);
+  AddTestCase (new WriteModeCreateTestCase, TestCase::QUICK);
+  AddTestCase (new ReadModeCreateTestCase, TestCase::QUICK);
+  //AddTestCase (new AppendModeCreateTestCase, TestCase::QUICK);
+  AddTestCase (new FileHeaderTestCase, TestCase::QUICK);
+  AddTestCase (new RecordHeaderTestCase, TestCase::QUICK);
+  AddTestCase (new ReadFileTestCase, TestCase::QUICK);
+  AddTestCase (new DiffTestCase, TestCase::QUICK);
 }
 
 static PcapFileTestSuite pcapFileTestSuite;

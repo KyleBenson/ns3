@@ -73,6 +73,11 @@ SteadyStateRandomWaypointMobilityModel::GetTypeId (void)
                    "Maximum Y value of traveling region, [m]",
                    DoubleValue (1),
                    MakeDoubleAccessor (&SteadyStateRandomWaypointMobilityModel::m_maxY),
+                   MakeDoubleChecker<double> ())
+    .AddAttribute ("Z",
+                   "Z value of traveling region (fixed), [m]",
+                   DoubleValue (0.0),
+                   MakeDoubleAccessor (&SteadyStateRandomWaypointMobilityModel::m_z),
                    MakeDoubleChecker<double> ());
 
   return tid;
@@ -93,14 +98,14 @@ SteadyStateRandomWaypointMobilityModel::SteadyStateRandomWaypointMobilityModel (
 }
 
 void
-SteadyStateRandomWaypointMobilityModel::DoStart (void)
+SteadyStateRandomWaypointMobilityModel::DoInitialize (void)
 {
-  SteadyStateStart ();
-  MobilityModel::DoStart ();
+  DoInitializePrivate ();
+  MobilityModel::DoInitialize ();
 }
 
 void
-SteadyStateRandomWaypointMobilityModel::SteadyStateStart (void)
+SteadyStateRandomWaypointMobilityModel::DoInitializePrivate (void)
 {
   alreadyStarted = true;
   // Configure random variables based on attributes
@@ -188,10 +193,10 @@ SteadyStateRandomWaypointMobilityModel::SteadyStateStart (void)
           NS_ASSERT (r <= 1);
         }
       double u2 = m_u_r->GetValue (0, 1);
-      m_helper.SetPosition (Vector (m_minX + u2*x1 + (1 - u2)*x2, m_minY + u2*y1 + (1 - u2)*y2, 0));
+      m_helper.SetPosition (Vector (m_minX + u2*x1 + (1 - u2)*x2, m_minY + u2*y1 + (1 - u2)*y2, m_z));
       NS_ASSERT (!m_event.IsRunning ());
       m_event = Simulator::ScheduleNow (&SteadyStateRandomWaypointMobilityModel::SteadyStateBeginWalk, this, 
-                                        Vector (m_minX + x2, m_minY + y2, 0));
+                                        Vector (m_minX + x2, m_minY + y2, m_z));
     }
   NotifyCourseChange ();
 }

@@ -1511,21 +1511,21 @@ GeocronTestSuite::GeocronTestSuite ()
   : TestSuite ("geocron", UNIT)
 {
   //basic data structs
-  AddTestCase (new TestPeerEntry);
-  AddTestCase (new TestPeerTable);
-  AddTestCase (new TestRonPath);
+  AddTestCase (new TestPeerEntry, TestCase::QUICK);
+  AddTestCase (new TestPeerTable, TestCase::QUICK);
+  AddTestCase (new TestRonPath, TestCase::QUICK);
 
   //heuristics
-  AddTestCase (new TestRonPathHeuristic);
-  AddTestCase (new TestAggregateRonPathHeuristic);
-  AddTestCase (new TestAngleRonPathHeuristic);
-  AddTestCase (new TestOrthogonalRonPathHeuristic);
-  AddTestCase (new TestDistRonPathHeuristic);
-  AddTestCase (new TestFurtherestFirstRonPathHeuristic);
+  AddTestCase (new TestRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestAggregateRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestAngleRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestOrthogonalRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestDistRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestFurtherestFirstRonPathHeuristic, TestCase::QUICK);
 
   //network application / experiment stuff
-  AddTestCase (new TestRonHeader);
-  AddTestCase (new TestGeocronExperiment);
+  AddTestCase (new TestRonHeader, TestCase::QUICK);
+  AddTestCase (new TestGeocronExperiment, TestCase::QUICK);
 }
 
 // Do not forget to allocate an instance of this TestSuite
