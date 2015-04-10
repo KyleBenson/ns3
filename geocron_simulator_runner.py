@@ -13,14 +13,15 @@ from os import system
 default_runs=20
 default_start=0 # num to start run IDs on
 default_nprocs=8
-default_as_choices=['3356', #level3
-                    #'1239', #sprintlink
-                    #'2914', #verio
-                    #smaller ones
-                    #'6461',
-                    #'1755',
-                    #'3967',
-                    ]
+default_file=['src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf',
+              #'3356', #level3
+              #'1239', #sprintlink
+              #'2914', #verio
+              #smaller ones
+              #'6461',
+              #'1755',
+              #'3967',
+              ]
 default_heuristics=['rand',
                     'ortho',
                     'newreg',
@@ -62,12 +63,13 @@ def parse_args(args):
                                      #formatter_class=argparse.RawTextHelpFormatter,
                                      #epilog='Text to display at the end of the help print',
                                      )
+    # Topology generation/loading parameters
+    parser.add_argument('--topology_file', '--file', '--as', nargs='+', default=default_file, dest='topologies',
+                        help='''choose the rocketfuel AS topologies or BRITE configuration files for the simulations (default=%(default)s)''')
+    parser.add_argument('--topology_type', '--topo', default="brite",
+                        help='''choose how to read/generate topology (rocketfuel or brite, default=%(default)s)''')
 
-    # Simulation parameters
-    parser.add_argument('--as', nargs='+', default=default_as_choices, dest='topologies',
-                        help='''choose the AS topologies for the simulations (default=%(default)s)''')
-    parser.add_argument('--topology_type', '--topo', default="rocketfuel",
-                        help='''choose how to read/generate topology (currently only rocketfuel)''')
+    # GeoCRON Simulation parameters
     parser.add_argument('--disasters', type=str, nargs='*', default=default_disasters,
                         help='''disaster locations to apply to ALL AS choices (cities currently) (default depends on AS)''')
     parser.add_argument('--fprobs', '-f', type=str, nargs='*',
@@ -124,8 +126,9 @@ def parse_args(args):
         if args.heuristics is default_heuristics:
             args.heuristics = args.heuristics[:1]
         #args.topologies = args.topologies[:1]
-        if args.topologies == default_as_choices:
-            args.topologies = ['3356'] #small topology in US
+        if args.topologies == default_file:
+            args.topologies = ['src/brite/examples/conf_files/RTWaxman20.conf']
+            #args.topologies = ['3356'] #small topology in US
             #TODO: something for rocketfuel once we feed that in to the GeocronExperiment
             if args.disasters == default_disasters:
                 args.disasters = ['2,2'] #25 nodes
@@ -189,12 +192,14 @@ def makecmds(args):
                 disasters = default_disasters[topology]
             cmd += '--disaster=%s ' % disasters
 
-            #TODO: brite topologies too
-            #cmd += '--file=rocketfuel/maps/%s.cch ' % topology
-
-            # instead, this hack lets us put the different runs in the same directory,
-            # but separate different processes since they will have different topologies
-            cmd += '--file=%s ' % i
+            # set topology type specific parameters
+            if args.topology_type == 'rocketfuel':
+                cmd += '--file=rocketfuel/maps/%s.cch ' % topology
+            elif args.topology_type == 'brite':
+                cmd += '--file=%s ' % topology
+            else:
+                print("Unrecognized topology generator type %s, exiting..." % topology_type)
+                system.exit()
 
             cmd += '--fail_prob=%s ' % fprobs
             cmd += '--runs=%i ' % nruns
@@ -204,6 +209,7 @@ def makecmds(args):
             # static args
             cmd += "--latencies=rocketfuel/weights/all_latencies.intra "
             cmd += "--locations=rocketfuel/city_locations.txt "
+            #TODO: fanout and remove timeout?
             cmd += "--contact_attempts=20 --timeout=0.5"
 
             ## $$$$ NO LONGER ASSUME SPACES " " AFTER COMMANDS!

@@ -24,7 +24,7 @@
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("RonDisasterSimulation");
+NS_LOG_COMPONENT_DEFINE ("GeocronDisasterSimulation");
 
 int 
 main (int argc, char *argv[])
@@ -168,7 +168,7 @@ main (int argc, char *argv[])
   exp->ReadLocationFile (locationFile);
   exp->ReadRocketfuelTopology (filename);
   */
-  
+
   exp->ReadBriteTopology (filename);
 
   exp->IndexNodes ();

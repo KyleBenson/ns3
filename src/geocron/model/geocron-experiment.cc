@@ -145,14 +145,9 @@ GeocronExperiment::IsOverlayNode (Ptr<Node> node)
 
 void GeocronExperiment::ReadBriteTopology (std::string topologyFile)
 {
-  this->topologyFile = topologyFile;
-  
-  //TODO: don't hard-code this
-  topologyFile = "src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman.conf";
-
   //TODO: make these part of the object so we can change it
   double boundaryLength = 1000;
-  
+
   Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
   NS_ASSERT_MSG (regionHelper, "Need BriteRegionHelper for ReadBriteTopology!");
 
@@ -164,6 +159,10 @@ void GeocronExperiment::ReadBriteTopology (std::string topologyFile)
   boost::hash_combine (seed, std::time (NULL));
   boost::hash_combine (seed, getpid());
   bth.AssignStreams (seed);
+  
+  // the topologyFile attribute is used to determine the name of the directory hierarchy
+  // the trace outputs will be saved to
+  this->topologyFile = boost::lexical_cast<std::string> (seed);
 
   //TODO: BGP routing and others
 
@@ -437,6 +436,9 @@ GeocronExperiment::RunAllScenarios ()
   boost::hash_combine (seed, getpid());
   SeedManager::SetSeed(seed);
   int runSeed = 0;
+
+  NS_LOG_UNCOND ("========================================================================");
+  NS_LOG_INFO ("Running all scenarios...");
 
   // Loop over all the possible scenarios, running the simulation and resetting between each
   for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
@@ -713,6 +715,8 @@ GeocronExperiment::ApplyFailureModel () {
 
 void
 GeocronExperiment::UnapplyFailureModel () {
+  NS_LOG_INFO ("Unapplying failure model");
+
   // Unfail the links that were chosen
   for (Ipv4InterfaceContainer::Iterator iface = ifacesToKill.Begin ();
        iface != ifacesToKill.End (); iface++)
@@ -807,6 +811,7 @@ GeocronExperiment::Run ()
 
   // pointToPoint.EnablePcap("rocketfuel-example",router_devices.Get(0),true);
 
+  NS_LOG_INFO ("------------------------------------------------------------------------");
   NS_LOG_UNCOND ("Starting simulation on map file " << topologyFile << ": " << std::endl
                  << nodes.GetN () << " total nodes" << std::endl
                  << overlayPeers->GetN () << " total overlay nodes" << std::endl
@@ -814,13 +819,14 @@ GeocronExperiment::Run ()
                  << numDisasterPeers << " overlay nodes in " << currLocation << std::endl //TODO: get size from table
                  << std::endl << "Failure probability: " << currFprob << std::endl
                  << failNodes.GetN () << " nodes failed" << std::endl
-                 << ifacesToKill.GetN () / 2 << " links failed");
+                 << ifacesToKill.GetN () / 2 << " links failed\n");
 
   Simulator::Stop (simulationLength);
   Simulator::Run ();
   Simulator::Destroy ();
 
   NS_LOG_INFO ("Next simulation run...");
+  NS_LOG_UNCOND ("========================================================================");
 
   //serverNode->GetObject<Ipv4NixVectorRouting> ()->FlushGlobalNixRoutingCache ();
   
