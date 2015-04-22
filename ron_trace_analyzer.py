@@ -134,14 +134,14 @@ def percentImprovement(nAcks, nDirectAcks):
         return float('inf')
 
 def normalizedTimes(nNodes, timeCounts):
-    '''Takes a node count and a TraceRun or TraceGroup getXTimes() function output (2-tuple) as input and 
+    '''Takes a node count and a TraceRun or TraceGroup getXTimes() function output (2-tuple) as input and
     returns the normalized form of the outputs (divides each data point by the node count).'''
-    
+
     return (timeCounts[0], [c/float(nNodes) for c in timeCounts[1]])
 
 
 def cumulative(timeCounts):
-    '''Takes a TraceRun or TraceGroup getXTimes() function output (2-tuple) as input and 
+    '''Takes a TraceRun or TraceGroup getXTimes() function output (2-tuple) as input and
     returns the cumulative number instead of the exact number during that time slice at each index.'''
 
     times = timeCounts[0]
@@ -203,7 +203,7 @@ class Parameters:
     @staticmethod
     def parseFolderHierarchy(name):
         parts = name.split(os.path.sep)
-        
+
         # cut off filename as its just the run #
         if not os.path.isdir(parts[-1]):
             parts = parts[:-1]
@@ -344,7 +344,7 @@ class TraceGroup:
     and had the same simulation parameters.
 
     Note that the getNNodes and getNAcks accessor functions will return the average value
-    over these 
+    over these
     '''
 
     def __init__(self,folder=None):
@@ -376,7 +376,7 @@ class TraceGroup:
         if not self.nNodes:
             self.nNodes = sum([t.getNNodes() for t in self.traces])/float(len(self.traces))
         return self.nNodes
-        
+
     def getNAcks(self):
         '''
         Get average number of acks for all TraceRuns in this group.
@@ -392,7 +392,7 @@ class TraceGroup:
         if not self.stdevNAcks:
             #check for no acks at all...
             nacks = [t.getNAcks() for t in self.traces]
-            if sum(nacks) == 0:
+            if sum(nacks) == 0 or len(nacks) <= 1:
                 self.stdevNAcks = 0
             else:
                 self.stdevNAcks = scipy.stats.tstd(nacks)
@@ -465,9 +465,12 @@ class TraceGroup:
         return self.forwardTimes
 
     def getUtility(self):
-        if not self.utility:
+        if self.utility is None:
             utilities = [n.getUtility() for n in self.traces if n.getUtility() is not None]
-            self.utility = float(sum(utilities))/len(utilities)
+            if utilities:
+                self.utility = float(sum(utilities))/len(utilities)
+            else:
+                self.utility = 0
         return self.utility
 
 ################################# MAIN ####################################
@@ -498,9 +501,9 @@ if __name__ == '__main__':
                 traceGroups.extend(group.traces)
             else:
                 traceGroups.append(group)
-    
+
     # Fix label for the groups
-    if args.label:   
+    if args.label:
         if (len(args.label) != len(traceGroups)) and (len(args.label) != 1):
             print "Number of given labels must equal the number of parsed directories or 1!"
             exit(1)
@@ -512,7 +515,7 @@ if __name__ == '__main__':
             for g in traceGroups:
                 g.name = args.label[0]
 
-    if args.prepend_label:   
+    if args.prepend_label:
         if (len(args.prepend_label) != len(traceGroups)) and (len(args.prepend_label) != 1):
             print "Number of given appendix labels must equal the number of parsed directories or 1!"
             exit(1)
@@ -524,7 +527,7 @@ if __name__ == '__main__':
             for g in traceGroups:
                 g.name = g.name + args.prepend_label[0]
 
-    if args.append_label:   
+    if args.append_label:
         if (len(args.append_label) != len(traceGroups)) and (len(args.append_label) != 1):
             print "Number of given appendix labels must equal the number of parsed directories or 1!"
             exit(1)
@@ -555,9 +558,12 @@ if __name__ == '__main__':
                 stdev = g.getStdevNAcks()
             except AttributeError:
                 stdev = 0.0
-            print "\t\t".join(["%-20s", '%.2f', '%.2f', '%.2f', '%.2f', '%.2f', '%.2f']) % (g.name, g.getNNodes(), nAcks, nDirectAcks,
-                                                                                    improvement, utility, stdev)
-        print '\n==========================================================================================================='
+            group_stats = (g.name, g.getNNodes(), nAcks, nDirectAcks, improvement, utility, stdev)
+            if None in group_stats:
+                print "At least one of the stats for group %s is None, probably no nodes were alive!" % g.name
+            else:
+                print "\t\t".join(["%-20s", '%.2f', '%.2f', '%.2f', '%.2f', '%.2f', '%.2f']) % group_stats
+            print '\n==========================================================================================================='
 
     if args.t_test:
         print "\n================================================= T-Test ==================================================\n"
@@ -569,12 +575,12 @@ if __name__ == '__main__':
 
             g1 = traceGroups[i]
             g2 = traceGroups[i+1]
-            
+
             if args.utility:
                 print 'Using utility instead of # ACKs'
                 g1_utilities = [r.getUtility() for r in g1.traces]
                 g2_utilities = [r.getUtility() for r in g2.traces]
-                
+
                 (t_statistic, p_value) = scipy.stats.ttest_ind(g1_utilities, g2_utilities)
                 print "\t\t".join(["%-20s", "%-20s", '%.2f', '%.2f', '%.2f', '%.2f']) % (g1.name, g2.name, g1.getUtility(), g2.getUtility(), t_statistic, p_value)
 
@@ -617,7 +623,7 @@ if __name__ == '__main__':
         if args.non_ron:
             #Assume they all have same fprob
             #TODO: don't
-            
+
             # Average all the groups' nDirectAcks (after normalizing them) and plot that
             nDirectAcks = 0
             for g in traceGroups:
@@ -627,7 +633,7 @@ if __name__ == '__main__':
 
             #max_x=max([max(g.getAckTimes()[0]) for g in traceGroups])
             #TODO: figure out why xmax/xmin don't work...
-            #plt.axhline(y=nDirectAcks, 
+            #plt.axhline(y=nDirectAcks,
             ackTimes = traceGroups[0].getAckTimes()[0]
             plt.plot(ackTimes, [nDirectAcks]*len(ackTimes), label='without RON', marker=markers[len(traceGroups)%len(markers)], color='r')
 
@@ -675,7 +681,7 @@ if __name__ == '__main__':
         # Then order them by fprob and plot them
         def fprob_key(run):
             return run.params.fprob
-        
+
         i = 0
         for heuristic,g in groups:
             #print [([r1.params.heuristic for r1 in r],heuristic) for heuristic,r in groups]

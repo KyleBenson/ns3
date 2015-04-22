@@ -56,7 +56,7 @@ GeocronExperiment::GeocronExperiment ()
   simulationLength = Seconds (10.0);
   overlayPeers = RonPeerTable::GetMaster ();
 
-  maxNDevs = 1;
+  maxNDevs = 5;
   //cmd.AddValue ("install_stubs", "If not 0, install RON client only on stub nodes (have <= specified links - 1 (for loopback dev))", maxNDevs);
 
   currLocation = "";
@@ -189,6 +189,12 @@ void GeocronExperiment::ReadBriteTopology (std::string topologyFile)
   // TODO: save information about AS's for that heuristic and other reasons
 
   NS_LOG_INFO ("Number of AS created " << bth.GetNAs ());
+
+  uint32_t n_leaves = 0;
+  for (uint32_t i = 0; i < bth.GetNAs (); i++)
+    n_leaves += bth.GetNLeafNodesForAs (i);
+
+  NS_LOG_INFO ("Number of leaves " << n_leaves);
 }
 
 
@@ -744,6 +750,9 @@ GeocronExperiment::SetNextServers () {
   Ptr<Node> serverNode = (serverNodeCandidates[currLocation].GetN () ?
                           serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)) :
                           nodes.Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)));
+
+  NS_LOG_INFO ("Server is Node " << serverNode->GetId () <<
+      " at location " << serverNode->GetObject<RonPeerEntry> ()->region);
 
   //Application
   RonServerHelper ronServer (9);
