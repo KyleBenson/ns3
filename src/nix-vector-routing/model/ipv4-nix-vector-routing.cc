@@ -26,6 +26,7 @@
 #include "ns3/names.h"
 #include "ns3/ipv4-list-routing.h"
 #include "ns3/boolean.h"
+#include "ns3/socket.h"
 
 #include "ipv4-nix-vector-routing.h"
 
@@ -61,6 +62,59 @@ Ipv4NixVectorRouting::Ipv4NixVectorRouting ()
 Ipv4NixVectorRouting::~Ipv4NixVectorRouting ()
 {
   NS_LOG_FUNCTION_NOARGS ();
+}
+
+void
+Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & nodes, NetDeviceContainer & sourceDevices)
+{
+  // The path does not include the source and destination nodes!
+  //
+  // Rather than reimplement the logic to find a NixVector and cache it if necessary,
+  // we instead fake the RouteOutput function into doing this for us with a fake-ish
+  // header. Afterwards, we're guaranteed that there will be a NixVector for us to
+  // use, if a path exists that is.
+  Ipv4Header head;
+  head.SetDestination (dest);
+  Socket::SocketErrno errno;
+  RouteOutput (NULL, head, NULL, errno);
+
+  // Now, we can get the NixVector from the cache, verify that the path exists,
+  // and build the path data structures from the NixVector using some additional
+  // helper functions in the NixVectorRouting class
+  Ptr<NixVector> nv = GetNixVectorInCache (dest);
+  NS_ASSERT_MSG (nv, "NixVector was NULL in cache: must be no route available!");
+  Ipv4Address gatewayIp; //for passing to FindNetDeviceForNixIndex as a dummy
+  Ptr<Node> destNode = GetNodeByIp (dest); //used for loop termination
+
+  // These variables will change at each step as we walk the NixVector
+  Ptr<Ipv4NixVectorRouting> nvr (this);
+  Ptr<Node> thisNode = m_node;
+
+  // Walk through the NixVector, extracting Nodes and Channels(sourceDevices) at each step
+  while (thisNode != destNode) {
+    uint32_t nodeDegree = nvr->FindTotalNeighbors ();
+    uint32_t devIdx = nvr->FindNetDeviceForNixIndex (nv->ExtractNeighborIndex(nv->BitCount(nodeDegree)), gatewayIp);
+    Ptr<NetDevice> device = thisNode->GetDevice (devIdx);
+    Ptr<Channel> link = device->GetChannel ();
+    sourceDevices.Add (device);
+
+    // move to next node and its respective NVR
+    // NOTE: there should really only be two devices on this channel as
+    // we assume p2p sourceDevices.  More work would be necessary for CSMA channels.
+    for (uint32_t i = 0; i < link->GetNDevices (); i++)
+    {
+      Ptr<NetDevice> possibleDevice = link->GetDevice (i);
+      if (possibleDevice != device)
+      {
+        thisNode = possibleDevice->GetNode ();
+        if (thisNode != destNode)
+          nodes.Add (thisNode);
+        nvr = thisNode->GetObject<Ipv4NixVectorRouting> ();
+        NS_ASSERT_MSG (nvr, "NixVectorRouting object is NULL! Fix network configuration!");
+        break;
+      }
+    }
+  }
 }
 
 void

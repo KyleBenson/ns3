@@ -129,12 +129,21 @@ public:
     grid = new PointToPointGridHelper (nrows, ncols, pointToPoint);
     grid->BoundingBox (0, 0, nrows, ncols);
 
+    // this routing configuration is taken straight from GeocronExperiment
+    Ipv4NixVectorHelper nixRouting;
+    nixRouting.SetAttribute("FollowDownEdges", BooleanValue (true));
+    Ipv4StaticRoutingHelper staticRouting;
+    Ipv4ListRoutingHelper routingList;
+    routingList.Add (staticRouting, 0);
+    routingList.Add (nixRouting, 10);
+
     InternetStackHelper internet;
+    internet.SetRoutingHelper (routingList);
     grid->InstallStack (internet);
     grid->AssignIpv4Addresses (rowHelper, colHelper);
     rowHelper.NewNetwork ();
     colHelper.NewNetwork ();
-  
+
     cachedNodes.Add (grid->GetNode (0,0));
     cachedNodes.Add (grid->GetNode (1,1));
     cachedNodes.Add (grid->GetNode (4,1)); //2nd choice for this V
@@ -147,11 +156,11 @@ public:
     NS_ASSERT_MSG (cachedNodes.Get (0)->GetId () != cachedNodes.Get (2)->GetId (), "nodes shouldn't ever have same ID!");
 
     for (NodeContainer::Iterator itr = cachedNodes.Begin (); itr != cachedNodes.End (); itr++)
-      {
-        Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
+    {
+      Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
 
-        //newPeer->id = id++;
-        cachedPeers.push_back (newPeer);
+      //newPeer->id = id++;
+      cachedPeers.push_back (newPeer);
       }
 
     //set regions for testing those types of heuristics
@@ -1489,6 +1498,118 @@ void TestGeocronExperiment::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ (GetNodeDegree (nodes.Get (2)), 3, "edge node doesn't have degree 3!");
 }
 
+class TestPathRetrieval : public TestCase
+{
+public:
+  TestPathRetrieval ();
+  virtual ~TestPathRetrieval ();
+  NodeContainer nodes;
+  Ptr<RonPeerTable> peers;
+
+private:
+  virtual void DoRun (void);
+};
+
+TestPathRetrieval::TestPathRetrieval ()
+  : TestCase ("Test the Ipv4NixVectorRouting mechanism for building node & link paths")
+{
+  nodes = GridGenerator::GetNodes ();
+}
+
+TestPathRetrieval::~TestPathRetrieval ()
+{}
+
+void TestPathRetrieval::DoRun (void)
+{
+  Ptr<Node> tl = GridGenerator::GetNode (0, 0), bl = GridGenerator::GetNode (0, 4), br = GridGenerator::GetNode (4, 4);
+
+  NodeContainer nodes1;
+  NetDeviceContainer devs1;
+
+  Ptr<Ipv4NixVectorRouting> nvr = tl->GetObject<Ipv4NixVectorRouting> ();
+  Ipv4Address addr = GetNodeAddress (bl);
+
+  nvr->GetPathFromIpv4Address (addr, nodes1, devs1);
+
+  NS_TEST_ASSERT_MSG_EQ (nodes1.GetN (), 3, "path should only have 3 nodes");
+  NS_TEST_ASSERT_MSG_EQ (devs1.GetN (), 4, "path should include 4 links");
+
+  // Let's verify the path is correct my iterating over what we know it should be.
+  // Nodes are relatively straightforward, but links are a bit tricky.
+  // To compare links(devices), we need to get the node at the other end of the given link
+  // and compare it with the node we will visit next. Thus, we add the destination node to
+  // the node list so that we can properly bookend the last link.
+  nodes1.Add (bl);
+  NodeContainer::Iterator nodeItr = nodes1.Begin ();
+  NetDeviceContainer::Iterator devItr = devs1.Begin ();
+  bool atEnd;
+
+  for (int i = 1; i < 5; i++)
+  {
+    // Links first since there are more and we're starting with the link preceding the first node
+    Ptr<Channel> channel = (*devItr)->GetChannel ();
+    NS_TEST_ASSERT_MSG_EQ (channel->GetNDevices (), 2, "WOAH! How does a p2p channel not have 2 NetDevices?");
+    Ptr<NetDevice> devOnOtherSide = (channel->GetDevice (0) == (*devItr) ? channel->GetDevice (1) : channel->GetDevice (0));
+    Ptr<Node> nodeOnOtherSide = devOnOtherSide->GetNode ();
+    NS_TEST_ASSERT_MSG_EQ (nodeOnOtherSide, (*nodeItr), "Node at other end of link not as expected at iteration " << i);
+
+    atEnd = (devItr == devs1.End ());
+    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "device iterator reached end earlier than expected!");
+    devItr++;
+
+    // nodes 
+    atEnd = (nodeItr == nodes1.End ());
+    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "node iterator reached end earlier than expected!");
+
+    NS_TEST_ASSERT_MSG_EQ (*nodeItr, GridGenerator::GetNode (0, i), "Node at location 0," << i << " is not correct!");
+    nodeItr++;
+  }
+  atEnd = (nodeItr == nodes1.End ());
+  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "node iterator didn't reach end: must be too many nodes?");
+  atEnd = (devItr == devs1.End ());
+  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "dev iterator didn't reach end: must be too many devices?");
+
+  // now get the next leg of the path
+  nvr = bl->GetObject<Ipv4NixVectorRouting> ();
+  addr = GetNodeAddress (br);
+  NodeContainer nodes2;
+  NetDeviceContainer devs2;
+
+  nvr->GetPathFromIpv4Address (addr, nodes2, devs2);
+
+  NS_TEST_ASSERT_MSG_EQ (nodes2.GetN (), 3, "path should only have 3 nodes");
+  NS_TEST_ASSERT_MSG_EQ (devs2.GetN (), 4, "path should include 4 links");
+
+  nodes2.Add (br);
+  nodeItr = nodes2.Begin ();
+  devItr = devs2.Begin ();
+
+  for (int i = 1; i < 5; i++)
+  {
+    // Links first since there are more and we're starting with the link preceding the first node
+    Ptr<Channel> channel = (*devItr)->GetChannel ();
+    NS_TEST_ASSERT_MSG_EQ (channel->GetNDevices (), 2, "WOAH! How does a p2p channel not have 2 NetDevices?");
+    Ptr<NetDevice> devOnOtherSide = (channel->GetDevice (0) == (*devItr) ? channel->GetDevice (1) : channel->GetDevice (0));
+    Ptr<Node> nodeOnOtherSide = devOnOtherSide->GetNode ();
+    NS_TEST_ASSERT_MSG_EQ (nodeOnOtherSide, (*nodeItr), "Node at other end of link not as expected at iteration " << i);
+
+    atEnd = (devItr == devs2.End ());
+    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "device iterator reached end earlier than expected!");
+    devItr++;
+
+    // nodes 
+    atEnd = (nodeItr == nodes2.End ());
+    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "node iterator reached end earlier than expected!");
+
+    NS_TEST_ASSERT_MSG_EQ (*nodeItr, GridGenerator::GetNode (i, 4), "Node at location " << i << ",4 is not correct!");
+    nodeItr++;
+  }
+  atEnd = (nodeItr == nodes2.End ());
+  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "node iterator didn't reach end: must be too many nodes?");
+  atEnd = (devItr == devs2.End ());
+  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "dev iterator didn't reach end: must be too many devices?");
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$////////////////////
@@ -1526,6 +1647,7 @@ GeocronTestSuite::GeocronTestSuite ()
   //network application / experiment stuff
   AddTestCase (new TestRonHeader, TestCase::QUICK);
   AddTestCase (new TestGeocronExperiment, TestCase::QUICK);
+  AddTestCase (new TestPathRetrieval, TestCase::QUICK);
 }
 
 // Do not forget to allocate an instance of this TestSuite

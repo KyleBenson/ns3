@@ -80,6 +80,16 @@ public:
    */
   void FlushGlobalNixRoutingCache (void) const;
 
+  /**
+   * Used to pull path information (nodes and channels/links) from
+   * the NixVectorRouting internals so that users don't have to
+   * implement their own graph search algorithms but can rather make
+   * use of those already here, including cached routes.
+   *
+   * Introduced for GeoCRON experiments.
+   */
+  void GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & nodes, NetDeviceContainer & sourceDevices);
+
 private:
 
   /* flushes the cache which stores nix-vector based on
