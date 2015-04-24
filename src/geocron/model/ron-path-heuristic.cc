@@ -137,7 +137,7 @@ RonPathHeuristic::BuildPaths (Ptr<PeerDestination> destination)
 void
 RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
 {
-  // All aggregate heuristics should know about the peer table, so we only need
+  // All aggregate heuristics should know about the likelihood table, so we only need
   // to check if any one heuristic has built paths once, i.e. if the table contains anything.
   PathLikelihoodInnerTable * table = &(m_likelihoods[destination]);
   if (table->size ())

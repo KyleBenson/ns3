@@ -42,7 +42,12 @@
 namespace ns3 {
 
 /** This class represents a heuristic for choosing overlay paths.  Derived classes must override the ComparePeers
-    function to implement the actual heuristic logic. */
+    function to implement the actual heuristic logic.
+
+    It includes logic for aggregating together multiple heuristics,
+    which allows for composing meta-heuristics of multiple weighted
+    heurstics.
+    */
 class RonPathHeuristic : public Object
 {
 public:
@@ -109,7 +114,7 @@ public:
   /** Get the likelihood of path being a successful overlay for reaching destination.
       By default, always assumes destination is reachable, i.e. always returns 1.0.
       The MOST IMPORTANT method to override/implement.
-   Can be chained together for multiple-hop overlays. */
+   */
   virtual double GetLikelihood (Ptr<RonPath> path);
 
   /** Adds the given path to the master likelihood table of the top-level heuristic,

@@ -795,15 +795,16 @@ GeocronExperiment::Run ()
         Ptr<RonPathHeuristic> heuristic = currHeuristic->Create<RonPathHeuristic> ();
         // Must set heuristic first so that source will be set and heuristic can make its heap
         heuristic->MakeTopLevel (); //must always do this! TODO: not need to?
+
         ronClient->SetHeuristic (heuristic);
         ronClient->SetServerPeerTable (serverPeers);
         heuristic->SetPeerTable (overlayPeers);
 
+        // add the random heuristic
         //TODO: do this by TypeId and remove #include from beggining
         Ptr<RonPathHeuristic> randHeuristic = CreateObject<RandomRonPathHeuristic> ();
-        //TODO: get this working
+        //TODO: get this working??? that's concerning maybe we should just turn this off...
         randHeuristic->SetAttribute ("Weight", DoubleValue (0.01));
-        //randHeuristic->
         heuristic->AddHeuristic (randHeuristic);
 
         ronClient->SetAttribute ("MaxPackets", UintegerValue (contactAttempts));
