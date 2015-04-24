@@ -81,7 +81,11 @@ Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & 
   // Now, we can get the NixVector from the cache, verify that the path exists,
   // and build the path data structures from the NixVector using some additional
   // helper functions in the NixVectorRouting class
-  Ptr<NixVector> nv = GetNixVectorInCache (dest);
+  //
+  // NOTE: you must get a copy of the NixVector from the cache or
+  // you'll end up extracting too many bits from it when it gets used
+  // for actual routing since extracting neighbor indexes mutates it
+  Ptr<NixVector> nv = GetNixVectorInCache (dest)->Copy ();
   NS_ASSERT_MSG (nv, "NixVector was NULL in cache: must be no route available!");
   Ipv4Address gatewayIp; //for passing to FindNetDeviceForNixIndex as a dummy
   Ptr<Node> destNode = GetNodeByIp (dest); //used for loop termination
