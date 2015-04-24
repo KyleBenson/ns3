@@ -1291,11 +1291,11 @@ TestAngleRonPathHeuristic::DoRun (void)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-class TestFurtherestFirstRonPathHeuristic : public TestCase
+class TestFarthestFirstRonPathHeuristic : public TestCase
 {
 public:
-  TestFurtherestFirstRonPathHeuristic ();
-  virtual ~TestFurtherestFirstRonPathHeuristic ();
+  TestFarthestFirstRonPathHeuristic ();
+  virtual ~TestFarthestFirstRonPathHeuristic ();
   NodeContainer nodes;
   PeerContainer peers;
 
@@ -1304,19 +1304,19 @@ private:
 };
 
 
-TestFurtherestFirstRonPathHeuristic::TestFurtherestFirstRonPathHeuristic ()
-  : TestCase ("Test FurtherestFirstRonPathHeuristic feature of RonPathHeuristic objects")
+TestFarthestFirstRonPathHeuristic::TestFarthestFirstRonPathHeuristic ()
+  : TestCase ("Test FarthestFirstRonPathHeuristic feature of RonPathHeuristic objects")
 {
   nodes = GridGenerator::GetNodes ();
   peers = GridGenerator::GetPeers ();
 }
 
-TestFurtherestFirstRonPathHeuristic::~TestFurtherestFirstRonPathHeuristic ()
+TestFarthestFirstRonPathHeuristic::~TestFarthestFirstRonPathHeuristic ()
 {
 }
 
 void
-TestFurtherestFirstRonPathHeuristic::DoRun (void)
+TestFarthestFirstRonPathHeuristic::DoRun (void)
 {
   bool equality;
   Ptr<PeerDestination> dest = Create<PeerDestination> (GridGenerator::GetPeer (0, 4)),
@@ -1327,7 +1327,7 @@ TestFurtherestFirstRonPathHeuristic::DoRun (void)
   path1->AddHop (botLeft, path1->Begin ());
   path2->AddHop (botRight, path2->Begin ());
 
-  Ptr<FurtherestFirstRonPathHeuristic> far = CreateObject<FurtherestFirstRonPathHeuristic> ();
+  Ptr<FarthestFirstRonPathHeuristic> far = CreateObject<FarthestFirstRonPathHeuristic> ();
   
   far->SetPeerTable (RonPeerTable::GetMaster ());
   far->SetSourcePeer (peers.front());
@@ -1642,7 +1642,7 @@ GeocronTestSuite::GeocronTestSuite ()
   AddTestCase (new TestAngleRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestOrthogonalRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestDistRonPathHeuristic, TestCase::QUICK);
-  AddTestCase (new TestFurtherestFirstRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestFarthestFirstRonPathHeuristic, TestCase::QUICK);
 
   //network application / experiment stuff
   AddTestCase (new TestRonHeader, TestCase::QUICK);

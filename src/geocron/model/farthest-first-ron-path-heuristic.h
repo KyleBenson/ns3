@@ -12,10 +12,10 @@
 
 namespace ns3 {
 
-class FurthestFirstRonPathHeuristic : public RonPathHeuristic
+class FarthestFirstRonPathHeuristic : public RonPathHeuristic
 {
 public:
-  FurthestFirstRonPathHeuristic ();
+  FarthestFirstRonPathHeuristic ();
   static TypeId GetTypeId (void);
 private:
   /** Minimum distance we will permit for peers.
