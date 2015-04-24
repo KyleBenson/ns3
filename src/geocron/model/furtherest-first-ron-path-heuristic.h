@@ -1,21 +1,21 @@
 /* 
- * File:   furtherest-first-ron-path-heuristic.h
+ * File:   furthest-first-ron-path-heuristic.h
  * Author: zhipengh
  *
  * Created on June 10, 2013, 10:29 PM
  */
 
-#ifndef FURTHEREST_FIRST_RON_PATH_HEURISTIC_H
-#define	FURTHEREST_FIRST_RON_PATH_HEURISTIC_H
+#ifndef FARTHEST_FIRST_RON_PATH_HEURISTIC_H
+#define	FARTHEST_FIRST_RON_PATH_HEURISTIC_H
 
 #include "ron-path-heuristic.h"
 
 namespace ns3 {
 
-class FurtherestFirstRonPathHeuristic : public RonPathHeuristic
+class FurthestFirstRonPathHeuristic : public RonPathHeuristic
 {
 public:
-  FurtherestFirstRonPathHeuristic ();
+  FurthestFirstRonPathHeuristic ();
   static TypeId GetTypeId (void);
 private:
   /** Minimum distance we will permit for peers.
@@ -26,5 +26,5 @@ private:
 
 } //namespace
 
-#endif	/* FURTHEREST_FIRST_RON_PATH_HEURISTIC_H */
+#endif	/* FARTHEST_FIRST_RON_PATH_HEURISTIC_H */
 
