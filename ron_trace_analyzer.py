@@ -137,6 +137,11 @@ def normalizedTimes(nNodes, timeCounts):
     '''Takes a node count and a TraceRun or TraceGroup getXTimes() function output (2-tuple) as input and
     returns the normalized form of the outputs (divides each data point by the node count).'''
 
+    #NOTE: shouldn't the avg. delivery ratio be (1/n)*sum((1/m)*sum(1 if delivered else 0 for each node in run i)
+    # where is the node count coming from?  won't each run have potentially
+    # different node counts?
+
+    #return (timeCounts[0], timeCounts[1])
     return (timeCounts[0], [c/float(nNodes) for c in timeCounts[1]])
 
 
@@ -147,11 +152,13 @@ def cumulative(timeCounts):
     times = timeCounts[0]
     counts = timeCounts[1]
 
+    if len(times) != len(counts):
+        print "times and counts aren't of equal size in cumulative()"
+
     total = 0
     for i in range(min(len(times), len(counts))):
-        if counts[i]:
-            total += counts[i]
-            counts[i] = total
+        total += counts[i]
+        counts[i] = total
 
     return (times, counts)
 
@@ -242,8 +249,11 @@ class TraceRun:
 
         sigDigits = int(round(-math.log(TraceRun.TIME_RESOLUTION,10)))
 
+        # Parse the trace file and store info about nodes, ACKs, etc.
         with open(filename) as f:
 
+            # Every line in the file is some packet sent/received/forwarded
+            # event
             for line in f.readlines():
                 parsed = line.split()
                 nodeId = parsed[TraceRun.NODE_ID_INDEX]
@@ -254,16 +264,37 @@ class TraceRun:
 
                 if not node:
                     node = self.nodes[nodeId] = TraceNode(nodeId)
+                    #print 'creating node %s' % nodeId
 
-                if 'ACK' in line:
-                    node.acks += 1
-                    self.ackTimes[time] = self.ackTimes.get(time,0) + 1
+                # We need to be careful that we only store one ACK per node or
+                # we will end up with incorrect data, e.g. delivery ratio > 1.0
+                # Therefore, we should only save ACKs if we haven't received a
+                # direct ACK yet OR if this is an indirect one and we already
+                # have one of those: make sure you can handle a direct ACK
+                # after an indirect one!
+                if 'ACK' in line and not node.directAcks:
+                    # Save direct ACK, but also remove any indirect ACKs if
+                    # they exist
+                    if 'direct' == parsed[TraceRun.DIRECT_ACK_INDEX]:
+                        if node.acks:
+                            self.ackTimes[node.firstAckTime] -= 1
+                            if self.ackTimes[node.firstAckTime] == 0:
+                                del self.ackTimes[node.firstAckTime]
+                            #print 'direct ACK at node %s overwriting previous ACK' % node.id
+                        #print 'ACK for node %s' % node.id
 
-                    if not node.firstAckTime:
+                        self.ackTimes[time] = self.ackTimes.get(time, 0) + 1
+                        node.directAcks = 1
+                        node.acks = 1
                         node.firstAckTime = time
 
-                    if 'direct' == parsed[TraceRun.DIRECT_ACK_INDEX]:
-                        node.directAcks += 1
+
+                    # Indirect ACK, so save if this is the first one only
+                    elif not node.firstAckTime:
+                        #print 'saving first indirect ACK for node %s' % node.id
+                        node.acks = 1
+                        self.ackTimes[time] = self.ackTimes.get(time, 0) + 1
+                        node.firstAckTime = time
 
                 if 'forwarded' == parsed[TraceRun.ACTION_INDEX]:
                     node.forwards += 1
@@ -314,6 +345,7 @@ class TraceRun:
         is the number of occurences in that time slice.
         '''
         if isinstance(self.ackTimes, dict):
+            # sort everything by time first since its a dict
             items = sorted(self.ackTimes.items())
             self.ackTimes = ([i for i,j in items], [j for i,j in items])
         return self.ackTimes
@@ -409,8 +441,8 @@ class TraceGroup:
     def averageTimes(self, runs):
         '''
         Takes as input a list of TraceRun.getXTimes() outputs.  Merges the lists together so that the counts
-        having the same time value are added, averages all of the counts, and then returns this new 2-tuple
-        that matches the format of the TraceRun.getXTimes() funcions.
+        having the same time value are added, averages all of the counts over the number of runs,
+        and then returns this new 2-tuple that matches the format of the TraceRun.getXTimes() funcions.
         '''
         newTimes = []
         newCounts = []
@@ -436,9 +468,12 @@ class TraceGroup:
                     pointsLeft[irun] -= 1
                     nextIndex[irun] += 1
 
+        assert(sum(newCounts) == sum(sum(r[1]) for r in runs))
+
         # Average the elements
         nRuns = float(nRuns)
-        return (newTimes, [count/nRuns for count in newCounts])
+        newCounts = [count/nRuns for count in newCounts]
+        return (newTimes, newCounts)
 
     def getSendTimes(self):
         '''
