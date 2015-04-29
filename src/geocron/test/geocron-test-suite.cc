@@ -1291,6 +1291,218 @@ TestAngleRonPathHeuristic::DoRun (void)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+class TestIdealRonPathHeuristic : public TestCase
+{
+public:
+  TestIdealRonPathHeuristic ();
+  virtual ~TestIdealRonPathHeuristic ();
+  NodeContainer nodes;
+  PeerContainer peers;
+
+private:
+  virtual void DoRun (void);
+};
+
+
+
+TestIdealRonPathHeuristic::TestIdealRonPathHeuristic ()
+  : TestCase ("Test IdealRonPathHeuristic")
+{
+  nodes = GridGenerator::GetNodes ();
+  peers = GridGenerator::GetPeers ();
+}
+
+TestIdealRonPathHeuristic::~TestIdealRonPathHeuristic ()
+{
+}
+
+void
+TestIdealRonPathHeuristic::DoRun (void)
+{
+  bool equality;
+  Ptr<Node> nodeToFail;
+  Ptr<RonPeerEntry> srcPeer = GridGenerator::GetPeer (0, 0);
+  Ptr<PeerDestination> dest = Create<PeerDestination> (GridGenerator::GetPeer (4, 4)),
+    src = Create<PeerDestination> (srcPeer),
+    topRight = Create<PeerDestination> (GridGenerator::GetPeer (4, 0)),
+    botLeft = Create<PeerDestination> (GridGenerator::GetPeer (0, 4));
+  Ptr<RonPath> path, path1 = Create<RonPath> (dest), path2 = Create<RonPath> (dest);
+  path1->AddHop (botLeft, path1->Begin ());
+  path2->AddHop (topRight, path2->Begin ());
+  equality = *path1 == *path2;
+  NS_TEST_ASSERT_MSG_NE (equality, true, "path1 should not equal path2!");
+
+  Ptr<IdealRonPathHeuristic> ideal = CreateObject<IdealRonPathHeuristic> ();
+  ideal->SetPeerTable (RonPeerTable::GetMaster ());
+  ideal->SetSourcePeer (srcPeer);
+  ideal->MakeTopLevel ();
+
+  //do this so we can check some internal data structs
+  //ideal->BuildPaths (dest);
+  int size = (*(ideal->m_masterLikelihoods))[dest].size ();
+  NS_TEST_ASSERT_MSG_EQ (size, 0, "PathLikelihoodInnerTable should have 0 paths, but got " << size);
+  ideal->AddPath (path1);
+  size = (*(ideal->m_masterLikelihoods))[dest].size ();
+  NS_TEST_ASSERT_MSG_EQ (size, 1, "PathLikelihoodInnerTable should have 1 path, but got " << size);
+  ideal->AddPath (path2);
+  size = (*(ideal->m_masterLikelihoods))[dest].size ();
+  NS_TEST_ASSERT_MSG_EQ (size, 2, "PathLikelihoodInnerTable should have 2 paths, but got " << size);
+
+  ideal->UpdateLikelihoods (dest);
+  size = (*(ideal->m_masterLikelihoods))[dest].size ();
+  NS_TEST_ASSERT_MSG_EQ (size, 2, "PathLikelihoodInnerTable should only have 2 paths, but got " << size);
+
+  path = ideal->GetBestPath (dest);
+
+  //make sure we get the right path
+  equality = (*(path) == *(path2)) or (*(path) == *(path1));
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "returned path should have top right or bottom left node!"); 
+  // we don't define a rigid tie-breaker, so check that we get both top-right and bottom-left, but not the same one each time
+  bool gotTopRight = true;
+  if (*path == *path1)
+    gotTopRight = false;
+
+  // verify we get the same path again before failing the nodes
+  Ptr<RonPath> lastPath = path;
+  path = ideal->GetBestPath (dest);
+  equality = *path == *lastPath;
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "Should have got same path again without calling Timeout!");
+
+  // now, we want to fail the overlay node it chose before, force an update, and verify that the other node is returned next
+  nodeToFail = (*((*lastPath->Begin ())->Begin ()))->node;
+  FailNode (nodeToFail);
+  ideal->m_updatedOnce = false; //TODO: this with a function?
+  ideal->UpdateLikelihoods (dest);
+
+  double lh = ((ideal->m_likelihoods))[dest][path]->GetLh ();
+  NS_TEST_ASSERT_MSG_EQ (lh, 0.0, "likelihood of failed path should be 0, but got " << lh);
+  lh = ideal->GetLikelihood (path);
+  NS_TEST_ASSERT_MSG_EQ (lh, 0.0, "likelihood of failed path should be 0, but got " << lh);
+
+  // now we should be getting the other path
+  path = ideal->GetBestPath (dest);
+
+  // now it should be the other one
+  if (gotTopRight) {
+    equality = (*(path) == *(path1));
+    NS_TEST_ASSERT_MSG_EQ (equality, true, "returned path should have bottom left node now!");
+  } else {
+    equality = (*(path) == *(path2));
+    NS_TEST_ASSERT_MSG_EQ (equality, true, "returned path should have top right node now!");
+  }
+
+  // Fail this other node and then we should get an Exception since no Paths will have LH > 0!
+  nodeToFail = (*((*path->Begin ())->Begin ()))->node;
+  FailNode (nodeToFail);
+  ideal->m_updatedOnce = false; //TODO: this with a function?
+  ideal->UpdateLikelihoods (dest);
+
+  try {
+    lastPath = path;
+    path = ideal->GetBestPath (dest);
+    equality = *path == *lastPath;
+    lh = (*(ideal->m_masterLikelihoods))[dest][path]->GetLh ();
+    NS_TEST_ASSERT_MSG_EQ (lh, 0.0, "likelihood of failed path should be 0, but got " << lh);
+    NS_TEST_ASSERT_MSG_EQ (equality, false, "should not have gotten the same path since we failed that node!");
+    NS_TEST_ASSERT_MSG_EQ (true, false, "should not have gotten any valid peers now that all are failed!");
+  }
+  catch (RonPathHeuristic::NoValidPeerException& e) {}
+
+  // let's unfail this node and verify that we get the last path again
+  UnfailNode (nodeToFail);
+  ideal->m_updatedOnce = false; //TODO: this with a function?
+  ideal->UpdateLikelihoods (dest);
+  lastPath = path;
+  path = ideal->GetBestPath (dest);
+  equality = (*path) == (*lastPath);
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "Should have gotten the last path again");
+  lh = (*(ideal->m_masterLikelihoods))[dest][path]->GetLh ();
+  NS_TEST_ASSERT_MSG_EQ (lh, 1.0, "likelihood of unfailed path should be 1, but got " << lh);
+
+  // now, we should fail some non-overlay nodes to check some
+  // edge conditions by verifying that failing some of the other nodes
+  // results in no paths being available as well
+
+  // check the first and last nodes on each leg of the path
+  // note that gotTopRight refers to the FIRST path,
+  // but we're now working with the second
+  NodeContainer nodesToFail;
+  if (!gotTopRight)
+  {
+    nodesToFail.Add (GridGenerator::GetNode (4, 0));
+    nodesToFail.Add (GridGenerator::GetNode (1, 0));
+    nodesToFail.Add (GridGenerator::GetNode (3, 0));
+    nodesToFail.Add (GridGenerator::GetNode (4, 3));
+    nodesToFail.Add (GridGenerator::GetNode (4, 1));
+  }
+  else
+  {
+    nodesToFail.Add (GridGenerator::GetNode (0, 4));
+    nodesToFail.Add (GridGenerator::GetNode (0, 1));
+    nodesToFail.Add (GridGenerator::GetNode (0, 3));
+    nodesToFail.Add (GridGenerator::GetNode (1, 4));
+    nodesToFail.Add (GridGenerator::GetNode (3, 4));
+  }
+
+  // Now iterate over each of these node edge cases and verify that failing
+  // only that one node will cause the heuristic to abandon that path entirely
+  for (NodeContainer::Iterator nodeItr = nodesToFail.Begin ();
+      nodeItr != nodesToFail.End (); nodeItr++)
+  {
+    nodeToFail = *nodeItr;
+    FailNode (nodeToFail);
+    ideal->m_updatedOnce = false; //TODO: this with a function?
+    ideal->UpdateLikelihoods (dest);
+    try {
+      lastPath = path;
+      path = ideal->GetBestPath (dest);
+      equality = *path == *lastPath;
+      Ptr<MobilityModel> mm = nodeToFail->GetObject<MobilityModel> ();
+      NS_TEST_ASSERT_MSG_EQ (true, false, "should not have gotten any valid peers now that all are failed! peer at (" << mm->GetPosition () << ")");
+    }
+    catch (RonPathHeuristic::NoValidPeerException& e) {}
+
+    // unfail that node and try the one on the end of the physical path first leg
+    UnfailNode (nodeToFail);
+  }
+
+  // Next, let's fail some links (NetDevices) and verify that the
+  // heuristic behaves as expected.  Let's make sure to also fail the
+  // first physical link on either path, hence adding topLeft to nodesToFail
+  nodesToFail.Add (GridGenerator::GetNode (0, 0));
+  for (NodeContainer::Iterator nodeItr = nodesToFail.Begin ();
+      nodeItr != nodesToFail.End (); nodeItr++)
+  {
+    // Fail all the links incident with this Node
+    Ptr<Ipv4> ipv4 = (*nodeItr)->GetObject<Ipv4> ();
+    for (uint32_t nDevs = 0; nDevs < ipv4->GetNInterfaces (); nDevs++)
+    {
+      FailIpv4 (ipv4, nDevs);
+    }
+    ideal->m_updatedOnce = false; //TODO: this with a function?
+    ideal->UpdateLikelihoods (dest);
+    try {
+      lastPath = path;
+      path = ideal->GetBestPath (dest);
+      equality = *path == *lastPath;
+      Ptr<MobilityModel> mm = (*nodeItr)->GetObject<MobilityModel> ();
+      NS_TEST_ASSERT_MSG_EQ (true, false, "should not have gotten any valid peers now that all are failed! peer at (" << mm->GetPosition () << ")");
+    }
+    catch (RonPathHeuristic::NoValidPeerException& e) {}
+
+    for (uint32_t nDevs = 0; nDevs < ipv4->GetNInterfaces (); nDevs++)
+    {
+      UnfailIpv4 (ipv4, nDevs);
+    }
+  }
+
+  // Need to unfail nodes!
+  UnfailNode ((*(botLeft->Begin ()))->node, Seconds (60));
+  UnfailNode ((*(topRight->Begin ()))->node, Seconds (60));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 class TestFarthestFirstRonPathHeuristic : public TestCase
 {
 public:
@@ -1547,9 +1759,7 @@ void TestPathRetrieval::DoRun (void)
   for (int i = 1; i < 5; i++)
   {
     // Links first since there are more and we're starting with the link preceding the first node
-    Ptr<Channel> channel = (*devItr)->GetChannel ();
-    NS_TEST_ASSERT_MSG_EQ (channel->GetNDevices (), 2, "WOAH! How does a p2p channel not have 2 NetDevices?");
-    Ptr<NetDevice> devOnOtherSide = (channel->GetDevice (0) == (*devItr) ? channel->GetDevice (1) : channel->GetDevice (0));
+    Ptr<NetDevice> devOnOtherSide = GetOtherNetDevice (*devItr);
     Ptr<Node> nodeOnOtherSide = devOnOtherSide->GetNode ();
     NS_TEST_ASSERT_MSG_EQ (nodeOnOtherSide, (*nodeItr), "Node at other end of link not as expected at iteration " << i);
 
@@ -1643,6 +1853,7 @@ GeocronTestSuite::GeocronTestSuite ()
   AddTestCase (new TestOrthogonalRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestDistRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestFarthestFirstRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestIdealRonPathHeuristic, TestCase::QUICK);
 
   //network application / experiment stuff
   AddTestCase (new TestRonHeader, TestCase::QUICK);
