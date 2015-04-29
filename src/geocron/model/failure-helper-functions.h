@@ -12,10 +12,12 @@ namespace ns3 {
   void FailIpv4 (Ptr<Ipv4> ipv4, uint32_t iface);
   void UnfailIpv4 (Ptr<Ipv4> ipv4, uint32_t iface);
   void FailNode (Ptr<Node> node);
-  void UnfailNode (Ptr<Node> node, Time appStopTime);
+  void UnfailNode (Ptr<Node> node, Time appStopTime = Seconds (60.0));
 
   Ipv4Address GetNodeAddress(Ptr<Node> node);
   uint32_t GetNodeDegree(Ptr<Node> node);
+  Ptr<NetDevice> GetOtherNetDevice (Ptr<NetDevice> thisDev);
+  Ptr<Node> GetNodeByIp (Ipv4Address dest);
 } //namespace ns3
 
 

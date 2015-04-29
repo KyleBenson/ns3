@@ -6,6 +6,8 @@
 
 namespace ns3 {
 
+NS_LOG_COMPONENT_DEFINE ("FailureHelperFunctions");
+
 // Fail links by turning off the net devices at each end
 void FailIpv4 (Ptr<Ipv4> ipv4, uint32_t iface)
 {
@@ -60,6 +62,39 @@ Ipv4Address GetNodeAddress(Ptr<Node> node)
 uint32_t GetNodeDegree(Ptr<Node> node)
 {
   return node->GetNDevices() - 1; //assumes PPP links
+}
+
+Ptr<NetDevice> GetOtherNetDevice (Ptr<NetDevice> thisDev)
+{
+  NS_ASSERT_MSG (thisDev->IsPointToPoint (), "GetOtherNetDevice assumes PointToPointNetDevices!");
+  Ptr<Channel> channel = thisDev->GetChannel ();
+  return (channel->GetDevice (0) == thisDev ? channel->GetDevice (1) : channel->GetDevice (0));
+}
+
+// This is ripped directly from Ipv4NixVectorRouting and repeated here for convenience
+Ptr<Node> GetNodeByIp (Ipv4Address dest)
+{
+  NodeContainer allNodes = NodeContainer::GetGlobal ();
+  Ptr<Node> destNode;
+
+  for (NodeContainer::Iterator i = allNodes.Begin (); i != allNodes.End (); ++i)
+    {
+      Ptr<Node> node = *i;
+      Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
+      if (ipv4->GetInterfaceForAddress (dest) != -1)
+        {
+          destNode = node;
+          break;
+        }
+    }
+
+  if (!destNode)
+    {
+      NS_LOG_ERROR ("Couldn't find dest node given the IP" << dest);
+      return 0;
+    }
+
+  return destNode;
 }
 
 }//namespace

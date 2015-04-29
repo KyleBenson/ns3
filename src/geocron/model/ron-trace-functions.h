@@ -22,6 +22,7 @@ namespace ns3 {
 void AckReceived (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p, uint32_t nodeId);
 void PacketForwarded (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p, uint32_t nodeId);
 void PacketSent (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p, uint32_t nodeId);
+void PacketReceivedAtServer (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p, uint32_t nodeId);
   
   //}; //class
 

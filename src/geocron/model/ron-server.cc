@@ -28,6 +28,7 @@
 #include "ns3/packet.h"
 #include "ns3/uinteger.h"
 
+#include "ron-trace-functions.h"
 #include "ron-header.h"
 #include "ron-server.h"
 
@@ -46,6 +47,8 @@ RonServer::GetTypeId (void)
                    UintegerValue (9),
                    MakeUintegerAccessor (&RonServer::m_port),
                    MakeUintegerChecker<uint16_t> ())
+    .AddTraceSource ("Receive", "A new packet is received by the server",
+                     MakeTraceSourceAccessor (&RonServer::m_recvTrace))
   ;
   return tid;
 }
@@ -129,6 +132,10 @@ RonServer::HandleRead (Ptr<Socket> socket)
 
           NS_LOG_INFO (head);
 
+          Ptr<Packet> packetWithHeader = packet->Copy ();
+          packetWithHeader->AddHeader (head);
+          m_recvTrace (packetWithHeader, GetNode ()->GetId ());
+
           head.ReversePath ();
 
           packet->AddHeader (head);
@@ -139,10 +146,18 @@ RonServer::HandleRead (Ptr<Socket> socket)
           NS_LOG_INFO ("ACKing " << (head.IsForward () ? "indirect" : "direct") << " packet from " <<
                        InetSocketAddress::ConvertFrom (from).GetIpv4 () <<
                        " on behalf of " << head.GetFinalDest ());
-          
+
           socket->SendTo (packet, 0, from);
         }
     }
+}
+
+void
+RonServer::ConnectTraces (Ptr<OutputStreamWrapper> traceOutputStream)
+{
+  this->TraceDisconnectWithoutContext ("Receive", m_recvcb);
+  m_recvcb = MakeBoundCallback (&PacketReceivedAtServer, traceOutputStream);
+  this->TraceConnectWithoutContext ("Receive", m_recvcb);
 }
 
 } // Namespace ns3

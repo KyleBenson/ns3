@@ -228,7 +228,7 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
           bestLikelihood = nextLh;
         }
     }
-  
+
   if (bestLikelihood <= 0.0)
     throw NoValidPeerException();
 
@@ -354,7 +354,6 @@ RonPathHeuristic::SetLikelihood (Ptr<RonPath> path, double lh)
   Ptr<PeerDestination> dest = path->GetDestination ();
   //NS_ASSERT (0.0 <= lh and lh <= 1.0);
   NS_LOG_LOGIC ("Path " << path << " has LH " << lh);
-  //m_peers.SetLikelihood (peer, 
   PathLikelihoodInnerTable * inner = &(m_likelihoods[dest]);
   NS_ASSERT_MSG (inner->size () > 0, "setting likelhiood but inner table is empty!");
   double realLh = lh*m_weight;

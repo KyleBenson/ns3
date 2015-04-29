@@ -114,6 +114,7 @@ private:
 
   NodeContainer nodes;
   ApplicationContainer clientApps;
+  ApplicationContainer serverApps;
   Ptr<RonPeerTable> overlayPeers;
   Ptr<RonPeerTable> serverPeers;
   std::string topologyFile;

@@ -23,6 +23,8 @@
 #include "ns3/event-id.h"
 #include "ns3/ptr.h"
 #include "ns3/address.h"
+#include "ns3/traced-callback.h"
+#include "ns3/output-stream-wrapper.h"
 
 namespace ns3 {
 
@@ -47,6 +49,8 @@ public:
   RonServer ();
   virtual ~RonServer ();
 
+  void ConnectTraces (Ptr<OutputStreamWrapper> traceOutputStream);
+
 protected:
   virtual void DoDispose (void);
 
@@ -56,6 +60,10 @@ private:
   virtual void StopApplication (void);
 
   void HandleRead (Ptr<Socket> socket);
+
+  // callbacks
+  TracedCallback<Ptr<const Packet>, uint32_t > m_recvTrace;
+  CallbackBase m_recvcb;
 
   uint16_t m_port;
   Ptr<Socket> m_socket;

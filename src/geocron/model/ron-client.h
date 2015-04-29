@@ -24,6 +24,7 @@
 #include "ns3/ptr.h"
 #include "ns3/address.h"
 #include "ns3/traced-callback.h"
+#include "ns3/output-stream-wrapper.h"
 
 #include "ron-header.h"
 #include "ron-peer-table.h"

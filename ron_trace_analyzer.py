@@ -243,6 +243,8 @@ class TraceRun:
         self.forwardTimes = {}
         self.ackTimes = {}
         self.sendTimes = {}
+        self.recvTimes = {} # received at server, not necessarilly ACKed
+        self.nodesHeardFrom = {} # if a packet is received at the server
         self.nNodes = None
 
         self.params = Parameters.parseFolderHierarchy(filename)
@@ -295,6 +297,13 @@ class TraceRun:
                         node.acks = 1
                         self.ackTimes[time] = self.ackTimes.get(time, 0) + 1
                         node.firstAckTime = time
+
+                # Rather than consider only ACKs, we also consider the
+                # server simply receiving packets as sometimes it will
+                # do so but is unable to properly ACK the message
+                if 'received' in line and nodeId not in self.nodesHeardFrom:
+                    self.recvTimes[time] = self.recvTimes.get(time, 0) + 1
+                    self.nodesHeardFrom[nodeId] = time
 
                 if 'forwarded' == parsed[TraceRun.ACTION_INDEX]:
                     node.forwards += 1
@@ -351,6 +360,17 @@ class TraceRun:
         return self.ackTimes
         #return (self.ackTimes.keys(), self.ackTimes.values())
 
+    def getRecvTimes(self):
+        '''
+        Returns a two-tuple of lists where the first list is the time values and the second
+        is the number of occurences in that time slice.
+        '''
+        if isinstance(self.recvTimes, dict):
+            # sort everything by time first since its a dict
+            items = sorted(self.recvTimes.items())
+            self.recvTimes = ([i for i,j in items], [j for i,j in items])
+        return self.recvTimes
+
     def getForwardTimes(self):
         '''
         Returns a two-tuple of lists where the first list is the time values and the second
@@ -387,6 +407,7 @@ class TraceGroup:
         self.nDirectAcks = None
         self.sendTimes = None
         self.ackTimes = None
+        self.recvTimes = None
         self.directAckTimes = None
         self.stdevNAcks = None
         self.utility = None
@@ -490,6 +511,14 @@ class TraceGroup:
         if not self.ackTimes:
             self.ackTimes = self.averageTimes([t.getAckTimes() for t in self.traces])
         return self.ackTimes
+
+    def getRecvTimes(self):
+        '''
+        Get average receive times for all TraceRuns in this group. This will likely create a more smoothed curve.
+        '''
+        if not self.recvTimes:
+            self.recvTimes = self.averageTimes([t.getRecvTimes() for t in self.traces])
+        return self.recvTimes
 
     def getForwardTimes(self):
         '''
@@ -651,7 +680,8 @@ if __name__ == '__main__':
         '''Cumulative number of ACKs at each time step'''
         markers = 'x.*+do^s1_|'
         for i,g in enumerate(traceGroups):
-            plt.plot(*cumulative(normalizedTimes(g.getNNodes(), g.getAckTimes())), label=g.name, marker=markers[i%len(markers)])
+            plt.plot(*cumulative(normalizedTimes(g.getNNodes(), g.getRecvTimes())), label=g.name, marker=markers[i%len(markers)])
+            #plt.plot(*cumulative(normalizedTimes(g.getNNodes(), g.getAckTimes())), label=g.name, marker=markers[i%len(markers)])
             #plt.plot(*cumulative(g.getAckTimes()), label=g.name, marker=markers[i%len(markers)]) #not normalyized
 
         # If requested, plot the ACKs for the non-RON case, which is just a horizontal line of the number of direct ACKs

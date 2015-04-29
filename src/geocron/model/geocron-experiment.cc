@@ -482,17 +482,27 @@ GeocronExperiment::ConnectAppTraces ()
   (void) PacketForwarded;
   (void) PacketSent;
   (void) AckReceived;
+  (void) PacketReceivedAtServer;
 
   if (traceFile != "")
     {
       Ptr<OutputStreamWrapper> traceOutputStream;
       AsciiTraceHelper asciiTraceHelper;
       traceOutputStream = asciiTraceHelper.CreateFileStream (traceFile);
-  
+
+      // connect client apps
       for (ApplicationContainer::Iterator itr = clientApps.Begin ();
            itr != clientApps.End (); itr++)
         {
           Ptr<RonClient> app = DynamicCast<RonClient> (*itr);
+          app->ConnectTraces (traceOutputStream);
+        }
+
+      // connect the server apps
+      for (ApplicationContainer::Iterator itr = serverApps.Begin ();
+           itr != serverApps.End (); itr++)
+        {
+          Ptr<RonServer> app = DynamicCast<RonServer> (*itr);
           app->ConnectTraces (traceOutputStream);
         }
     }
@@ -710,8 +720,17 @@ GeocronExperiment::ApplyFailureModel () {
           {
             if (random->GetValue () < currFprob)
               {
+                // fail both this end of the link and the other side!
                 ifacesToKill.Add(ipv4, i);
                 FailIpv4 (ipv4, i);
+
+                // get the necessary info for the other end of the link
+                Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (node->GetDevice (i));
+                Ptr<Ipv4> otherIpv4 = otherNetDevice->GetNode ()->GetObject<Ipv4> ();
+                uint32_t otherIndex = otherIpv4->GetInterfaceForDevice (otherNetDevice);
+
+                ifacesToKill.Add(otherIpv4, otherIndex);
+                FailIpv4 (otherIpv4, otherIndex);
               }
           }
       }
@@ -757,7 +776,7 @@ GeocronExperiment::SetNextServers () {
   //Application
   RonServerHelper ronServer (9);
 
-  ApplicationContainer serverApps = ronServer.Install (serverNode);
+  serverApps = ronServer.Install (serverNode);
   serverApps.Start (Seconds (1.0));
   serverApps.Stop (appStopTime);
 
@@ -802,10 +821,10 @@ GeocronExperiment::Run ()
 
         // add the random heuristic
         //TODO: do this by TypeId and remove #include from beggining
-        Ptr<RonPathHeuristic> randHeuristic = CreateObject<RandomRonPathHeuristic> ();
+        //Ptr<RonPathHeuristic> randHeuristic = CreateObject<RandomRonPathHeuristic> ();
         //TODO: get this working??? that's concerning maybe we should just turn this off...
-        randHeuristic->SetAttribute ("Weight", DoubleValue (0.01));
-        heuristic->AddHeuristic (randHeuristic);
+        //randHeuristic->SetAttribute ("Weight", DoubleValue (0.01));
+        //heuristic->AddHeuristic (randHeuristic);
 
         ronClient->SetAttribute ("MaxPackets", UintegerValue (contactAttempts));
         numDisasterPeers++;
