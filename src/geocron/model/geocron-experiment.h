@@ -88,6 +88,7 @@ public:
   uint32_t contactAttempts;
   uint32_t nruns;
   uint32_t start_run_number;
+  std::size_t seed; // for generating topology files
 
   /** Builds various indices for choosing different node types of interest.
       Chooses links/nodes that may be failed during disaster simulation.

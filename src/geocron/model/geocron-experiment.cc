@@ -67,6 +67,7 @@ GeocronExperiment::GeocronExperiment ()
   traceFile = "";
   nruns = 1;
   nServerChoices = 10;
+  seed = 0;
 
   regionHelper = NULL;
   serverNode = NULL;
@@ -157,9 +158,11 @@ void GeocronExperiment::ReadBriteTopology (std::string topologyFile)
 
   BriteTopologyHelper bth (topologyFile);
   // need to seed it with something different from any other running procs
-  std::size_t seed = 0;
-  boost::hash_combine (seed, std::time (NULL));
-  boost::hash_combine (seed, getpid());
+  if (seed == 0)
+  {
+    boost::hash_combine (seed, std::time (NULL));
+    boost::hash_combine (seed, getpid());
+  }
   bth.AssignStreams (seed);
   
   // the topologyFile attribute is used to determine the name of the directory hierarchy
@@ -412,7 +415,7 @@ GeocronExperiment::AutoSetTraceFile ()
 
   // set output number if start_run_number is specified
   uint32_t outnum = currRun;
-  if (start_run_number and nruns > 1)
+  if (start_run_number)
     outnum = currRun + start_run_number;
   
   std::string fname = "run";

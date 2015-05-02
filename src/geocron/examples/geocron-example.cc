@@ -53,6 +53,7 @@ main (int argc, char *argv[])
   CommandLine cmd;
   // file /topology generator parameters
   cmd.AddValue ("file", "File to read network topology, or configuration in the case of topology generators, from", filename);
+  cmd.AddValue ("seed", "Random seed used to generate random topologies.  Chosen based on time and pid by default.", exp->seed);
 
   // cmd.AddValue ("event_radius", "Radius of affect of the events", exp->eventRadius);
   // cmd.AddValue ("boundary", "Length of (one side) of the square bounding box for the geographic region under study (in meters)", exp->boundaryLength);

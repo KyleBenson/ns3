@@ -46,7 +46,7 @@ default_disasters = {'3356' : '0,0'}
 #default_disasters['3356']='"New_York,_NY-Los_Angeles,_CA-Miami,_FL"'
 #default_disasters['2914']='"New_York,_NY-Irvine,_CA"' #New_Orleans,_LA-
 #default_disasters['1239']='"New_York,_NY-Dallas,_TX-Washington,_DC"'
-default_verbosity_level=0
+default_verbosity_level= -1 # means verbose in the runner but not in the experiment itself
 
 def parse_args(args):
 ## DEFAULTS
@@ -68,6 +68,10 @@ def parse_args(args):
                         help='''choose the rocketfuel AS topologies or BRITE configuration files for the simulations (default=%(default)s)''')
     parser.add_argument('--topology_type', '--topo', default="brite",
                         help='''choose how to read/generate topology (rocketfuel or brite, default=%(default)s)''')
+    parser.add_argument('--seed', default=0, type=int,
+                        help='''Random seed for generating topologies with brite, default is to let the GeocronExperiment choose it itself,
+                        which will result in using a combination of the time and pid, hence giving a unique seed to each process.  Using this
+                        parameter will result in all of the simulations having the same seed and hence same topology.''')
 
     # GeoCRON Simulation parameters
     parser.add_argument('--disasters', type=str, nargs='*', default=default_disasters,
@@ -210,16 +214,18 @@ def makecmds(args):
             cmd += '--runs=%i ' % nruns
             cmd += '--start_run=%i ' % startnum
             cmd += '--heuristic=%s ' % heuristics
+            cmd += '--contact_attempts=%d ' % args.contact_attempts
+            cmd += '--seed=%d ' % args.seed
+            cmd += '--npaths=%s ' % npaths
 
             # static args
             cmd += "--latencies=rocketfuel/weights/all_latencies.intra "
             cmd += "--locations=rocketfuel/city_locations.txt "
-            #TODO: fanout and remove timeout?
-            cmd += "--contact_attempts=%d --timeout=0.5" % args.contact_attempts
+            cmd += "--timeout=0.5 "
 
             ## $$$$ NO LONGER ASSUME SPACES " " AFTER COMMANDS!
 
-            if args.verbose:
+            if args.verbose > -1:
                 cmd += ' --verbose=%i' % args.verbose
             cmd += "'" #terminate command template (non-waf args)
 
@@ -242,7 +248,7 @@ if __name__ == "__main__":
 
     #TODO: fix these 2
     #if args.optimized:
-        #subprocess.call("./waf -d optimized configure --enable-examples", shell=True)
+        #subprocess.call("./waf -d optimized configure --enable-examples --disable-python", shell=True)
 
     # run waf build if we're using multiple processes
     if args.nprocs > 1 and subprocess.call("./waf build", shell=True) == 1:

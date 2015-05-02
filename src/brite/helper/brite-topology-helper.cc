@@ -28,6 +28,8 @@
 
 #include "brite-topology-helper.h"
 
+#include <unistd.h> // for getpid() used for seedFileName
+
 #include <iostream>
 #include <fstream>
 
@@ -323,6 +325,12 @@ void BriteTopologyHelper::GenerateBriteTopology (void)
   //check to see if need to generate seed file
   bool generateSeedFile = m_seedFile.empty ();
 
+  // save the seed file with a unique ID corresponding to our PID so
+  // multiple processes can run BRITE at the same time without conflicts
+  std::stringstream seedFileNameStream;
+  seedFileNameStream << "briteSeedFile" << getpid () << ".txt";
+  std::string seedFileName = seedFileNameStream.str ();
+
   if (generateSeedFile)
     {
       NS_LOG_LOGIC ("Generating BRITE Seed file");
@@ -330,7 +338,7 @@ void BriteTopologyHelper::GenerateBriteTopology (void)
       std::ofstream seedFile;
 
       //overwrite file if already there
-      seedFile.open ("briteSeedFile.txt", std::ios_base::out | std::ios_base::trunc);
+      seedFile.open (seedFileName.c_str (), std::ios_base::out | std::ios_base::trunc);
 
       //verify open
       NS_ASSERT (!seedFile.fail ());
@@ -346,7 +354,7 @@ void BriteTopologyHelper::GenerateBriteTopology (void)
       seedFile.close ();
 
       //if we're using NS3 generated seed files don't want brite to create a new seed file.
-      m_seedFile = m_newSeedFile = "briteSeedFile.txt";
+      m_seedFile = m_newSeedFile = seedFileName;
     }
 
   brite::Brite br (m_confFile, m_seedFile, m_newSeedFile);
@@ -357,7 +365,7 @@ void BriteTopologyHelper::GenerateBriteTopology (void)
   //brite automatically spits out the seed values used to a seperate file so no need to keep this anymore
   if (generateSeedFile)
     {
-      remove ("briteSeedFile.txt");
+      remove (seedFileName.c_str ());
     }
 
 }
