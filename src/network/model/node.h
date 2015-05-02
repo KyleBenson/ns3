@@ -121,6 +121,14 @@ public:
   Ptr<Application> GetApplication (uint32_t index) const;
 
   /**
+   * \brief Remove the index-th Application associated to this node.
+   *
+   * \param index the index of the requested Application
+   * \returns the requested Application.
+   */
+  Ptr<Application> RemoveApplication (uint32_t index);
+
+  /**
    * \returns the number of Application instances associated to this Node.
    */
   uint32_t GetNApplications (void) const;

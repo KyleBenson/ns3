@@ -164,6 +164,25 @@ Node::GetApplication (uint32_t index) const
                  " is out of range (only have " << m_applications.size () << " applications).");
   return m_applications[index];
 }
+Ptr<Application> 
+Node::RemoveApplication (uint32_t index)
+{
+  NS_LOG_FUNCTION (this << index);
+  NS_ASSERT_MSG (index < m_applications.size (), "Application index " << index <<
+                 " is out of range (only have " << m_applications.size () << " applications).");
+
+  // Schedule the app to destroy itself to prevent floating apps with
+  // no associated nodes from starting up
+  Ptr<Application> application = m_applications[index];
+  Simulator::Schedule(Seconds (0.0), &Application::Dispose, application);
+
+  // Get an iterator and increment it a number of times equal to the index requested
+  std::vector<Ptr<Application> >::iterator itr = m_applications.begin ();
+  for (; index > 0; itr++, index--)
+  {}
+  m_applications.erase (itr);
+  return application;
+}
 uint32_t 
 Node::GetNApplications (void) const
 {

@@ -68,6 +68,7 @@ void
 RonServer::DoDispose (void)
 {
   NS_LOG_FUNCTION_NOARGS ();
+  StopApplication ();
   Application::DoDispose ();
 }
 
