@@ -64,32 +64,47 @@ IdealRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
   {
     nvr = node->GetObject<Ipv4NixVectorRouting> ();
     NodeContainer nodes;
-    NetDeviceContainer links;
+    Ipv4InterfaceContainer links;
     Ipv4Address addr = (*(*pathItr)->Begin ())->address;
-    nvr->GetPathFromIpv4Address (addr, nodes, links);
+
+    // Get the path if it exists, return false otherwise
+    if (!nvr->GetPathFromIpv4Address (addr, nodes, links))
+      return 0;
 
     // Verify that all links are up.
-    for (NetDeviceContainer::Iterator linkItr = links.Begin ();
+    for (Ipv4InterfaceContainer::Iterator linkItr = links.Begin ();
         linkItr != links.End (); linkItr++)
     {
-      if (!(*linkItr)->IsLinkUp ())
+      if (!((linkItr->first)->IsUp (linkItr->second)))
         return 0;
     }
 
     // Verify that all nodes are up
-    // NOTE: this shouldn't actually be necessary as a failed node will
-    // have all of its interfaces failed too
-    nodes.Add (node);
-    for (NodeContainer::Iterator nodeItr = nodes.Begin ();
-        nodeItr != nodes.End (); nodeItr++)
-    {
-      Ptr<Ipv4> ipv4 = (*nodeItr)->GetObject<Ipv4> ();
-      for (uint32_t nDevs = 0; nDevs < ipv4->GetNInterfaces (); nDevs++)
-      {
-        if (!ipv4->IsUp (nDevs))
-          return 0;
-      }
-    }
+    // NOTE: this is necessary as even though a failed node will
+    // have all of its interfaces failed too, the failure mechanism
+    // only handles one side of the link, which can lead to misleading
+    // situations if only one end is checked for being up
+    // FOLLOWUP NOTE: this is no longer necessary as we fixed the
+    // failure model to fail both ends of a link when a LINK is failed.
+    // This could still result in an issue if a NODE is failed on the
+    // other end, but then we would have discovered that all the links
+    // exiting that node would be down too!  So unless we have the possibility
+    // of a final destination (server node? overlay?) failing, this is not an issue.
+    // If it is, we should really only have to check the final node on the path anyway.
+    //nodes.Add (node);
+    //for (NodeContainer::Iterator nodeItr = nodes.Begin ();
+        //nodeItr != nodes.End (); nodeItr++)
+    //{
+      //Ptr<Ipv4> ipv4 = (*nodeItr)->GetObject<Ipv4> ();
+      //bool oneLinkUp = false; // if we find one link that's up, this node isn't failed
+      //for (uint32_t nDevs = 0; nDevs < ipv4->GetNInterfaces (); nDevs++)
+      //{
+        //if (ipv4->IsUp (nDevs))
+          //oneLinkUp = true;
+      //}
+      //if (!oneLinkUp)
+        //return 0;
+    //}
 
     // advance to next node in order to update source for NVR
     node = (*(*pathItr)->Begin ())->node;

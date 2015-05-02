@@ -64,8 +64,8 @@ Ipv4NixVectorRouting::~Ipv4NixVectorRouting ()
   NS_LOG_FUNCTION_NOARGS ();
 }
 
-void
-Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & nodes, NetDeviceContainer & sourceDevices)
+bool
+Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & nodes, Ipv4InterfaceContainer & sourceInterfaces)
 {
   // The path does not include the source and destination nodes!
   //
@@ -79,14 +79,17 @@ Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & 
   RouteOutput (NULL, head, NULL, errno);
 
   // Now, we can get the NixVector from the cache, verify that the path exists,
+  // return false if it does not so that this route will not be attempted,
   // and build the path data structures from the NixVector using some additional
   // helper functions in the NixVectorRouting class
   //
   // NOTE: you must get a copy of the NixVector from the cache or
   // you'll end up extracting too many bits from it when it gets used
   // for actual routing since extracting neighbor indexes mutates it
-  Ptr<NixVector> nv = GetNixVectorInCache (dest)->Copy ();
-  NS_ASSERT_MSG (nv, "NixVector was NULL in cache: must be no route available!");
+  Ptr<NixVector> nv = GetNixVectorInCache (dest);
+  if (!nv)
+    return 0;
+  nv = nv->Copy ();
   Ipv4Address gatewayIp; //for passing to FindNetDeviceForNixIndex as a dummy
   Ptr<Node> destNode = GetNodeByIp (dest); //used for loop termination
 
@@ -94,17 +97,20 @@ Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & 
   Ptr<Ipv4NixVectorRouting> nvr (this);
   Ptr<Node> thisNode = m_node;
 
-  // Walk through the NixVector, extracting Nodes and Channels(sourceDevices) at each step
+  // Walk through the NixVector, extracting Nodes and Channels(sourceInterfaces) at each step
   while (thisNode != destNode) {
     uint32_t nodeDegree = nvr->FindTotalNeighbors ();
     uint32_t devIdx = nvr->FindNetDeviceForNixIndex (nv->ExtractNeighborIndex(nv->BitCount(nodeDegree)), gatewayIp);
     Ptr<NetDevice> device = thisNode->GetDevice (devIdx);
-    Ptr<Channel> link = device->GetChannel ();
-    sourceDevices.Add (device);
+
+    Ptr<Ipv4> ipv4 = thisNode->GetObject<Ipv4> ();
+    uint32_t interfaceIndex = ipv4->GetInterfaceForDevice (device);
+    sourceInterfaces.Add (ipv4, interfaceIndex);
 
     // move to next node and its respective NVR
-    // NOTE: there should really only be two devices on this channel as
+    // NOTE: there should really only be two interfaces on this channel as
     // we assume p2p sourceDevices.  More work would be necessary for CSMA channels.
+    Ptr<Channel> link = device->GetChannel ();
     for (uint32_t i = 0; i < link->GetNDevices (); i++)
     {
       Ptr<NetDevice> possibleDevice = link->GetDevice (i);
@@ -119,6 +125,7 @@ Ipv4NixVectorRouting::GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & 
       }
     }
   }
+  return true;
 }
 
 void

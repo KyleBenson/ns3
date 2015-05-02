@@ -31,6 +31,7 @@
 #include "ns3/ipv4-route.h"
 #include "ns3/nix-vector.h"
 #include "ns3/bridge-net-device.h"
+#include "ns3/ipv4-interface-container.h"
 
 namespace ns3 {
 
@@ -86,9 +87,10 @@ public:
    * implement their own graph search algorithms but can rather make
    * use of those already here, including cached routes.
    *
+   * Returns: true if the path exists, false otherwise
    * Introduced for GeoCRON experiments.
    */
-  void GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & nodes, NetDeviceContainer & sourceDevices);
+  bool GetPathFromIpv4Address (Ipv4Address dest, NodeContainer & nodes, Ipv4InterfaceContainer & sourceDevices);
 
 private:
 

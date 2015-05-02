@@ -1466,7 +1466,7 @@ TestIdealRonPathHeuristic::DoRun (void)
     UnfailNode (nodeToFail);
   }
 
-  // Next, let's fail some links (NetDevices) and verify that the
+  // Next, let's fail some links (Ipv4Interfaces) and verify that the
   // heuristic behaves as expected.  Let's make sure to also fail the
   // first physical link on either path, hence adding topLeft to nodesToFail
   nodesToFail.Add (GridGenerator::GetNode (0, 0));
@@ -1736,36 +1736,37 @@ void TestPathRetrieval::DoRun (void)
   Ptr<Node> tl = GridGenerator::GetNode (0, 0), bl = GridGenerator::GetNode (0, 4), br = GridGenerator::GetNode (4, 4);
 
   NodeContainer nodes1;
-  NetDeviceContainer devs1;
+  Ipv4InterfaceContainer ifaces1;
 
   Ptr<Ipv4NixVectorRouting> nvr = tl->GetObject<Ipv4NixVectorRouting> ();
   Ipv4Address addr = GetNodeAddress (bl);
 
-  nvr->GetPathFromIpv4Address (addr, nodes1, devs1);
+  nvr->GetPathFromIpv4Address (addr, nodes1, ifaces1);
 
   NS_TEST_ASSERT_MSG_EQ (nodes1.GetN (), 3, "path should only have 3 nodes");
-  NS_TEST_ASSERT_MSG_EQ (devs1.GetN (), 4, "path should include 4 links");
+  NS_TEST_ASSERT_MSG_EQ (ifaces1.GetN (), 4, "path should include 4 links");
 
   // Let's verify the path is correct my iterating over what we know it should be.
   // Nodes are relatively straightforward, but links are a bit tricky.
-  // To compare links(devices), we need to get the node at the other end of the given link
+  // To compare links(Ipv4Interfaces), we need to get the node at the other end of the link
+  // corresponding with this iface
   // and compare it with the node we will visit next. Thus, we add the destination node to
   // the node list so that we can properly bookend the last link.
   nodes1.Add (bl);
   NodeContainer::Iterator nodeItr = nodes1.Begin ();
-  NetDeviceContainer::Iterator devItr = devs1.Begin ();
+  Ipv4InterfaceContainer::Iterator ifaceItr = ifaces1.Begin ();
   bool atEnd;
 
   for (int i = 1; i < 5; i++)
   {
     // Links first since there are more and we're starting with the link preceding the first node
-    Ptr<NetDevice> devOnOtherSide = GetOtherNetDevice (*devItr);
+    Ptr<NetDevice> devOnOtherSide = GetOtherNetDevice (ifaceItr->first->GetNetDevice (ifaceItr->second));
     Ptr<Node> nodeOnOtherSide = devOnOtherSide->GetNode ();
     NS_TEST_ASSERT_MSG_EQ (nodeOnOtherSide, (*nodeItr), "Node at other end of link not as expected at iteration " << i);
 
-    atEnd = (devItr == devs1.End ());
-    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "device iterator reached end earlier than expected!");
-    devItr++;
+    atEnd = (ifaceItr == ifaces1.End ());
+    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "iface iterator reached end earlier than expected!");
+    ifaceItr++;
 
     // nodes 
     atEnd = (nodeItr == nodes1.End ());
@@ -1776,36 +1777,34 @@ void TestPathRetrieval::DoRun (void)
   }
   atEnd = (nodeItr == nodes1.End ());
   NS_TEST_ASSERT_MSG_EQ (atEnd, true, "node iterator didn't reach end: must be too many nodes?");
-  atEnd = (devItr == devs1.End ());
-  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "dev iterator didn't reach end: must be too many devices?");
+  atEnd = (ifaceItr == ifaces1.End ());
+  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "iface iterator didn't reach end: must be too many interfaces?");
 
   // now get the next leg of the path
   nvr = bl->GetObject<Ipv4NixVectorRouting> ();
   addr = GetNodeAddress (br);
   NodeContainer nodes2;
-  NetDeviceContainer devs2;
+  Ipv4InterfaceContainer ifaces2;
 
-  nvr->GetPathFromIpv4Address (addr, nodes2, devs2);
+  nvr->GetPathFromIpv4Address (addr, nodes2, ifaces2);
 
   NS_TEST_ASSERT_MSG_EQ (nodes2.GetN (), 3, "path should only have 3 nodes");
-  NS_TEST_ASSERT_MSG_EQ (devs2.GetN (), 4, "path should include 4 links");
+  NS_TEST_ASSERT_MSG_EQ (ifaces2.GetN (), 4, "path should include 4 links");
 
   nodes2.Add (br);
   nodeItr = nodes2.Begin ();
-  devItr = devs2.Begin ();
+  ifaceItr = ifaces2.Begin ();
 
   for (int i = 1; i < 5; i++)
   {
     // Links first since there are more and we're starting with the link preceding the first node
-    Ptr<Channel> channel = (*devItr)->GetChannel ();
-    NS_TEST_ASSERT_MSG_EQ (channel->GetNDevices (), 2, "WOAH! How does a p2p channel not have 2 NetDevices?");
-    Ptr<NetDevice> devOnOtherSide = (channel->GetDevice (0) == (*devItr) ? channel->GetDevice (1) : channel->GetDevice (0));
+    Ptr<NetDevice> devOnOtherSide = GetOtherNetDevice (ifaceItr->first->GetNetDevice (ifaceItr->second));
     Ptr<Node> nodeOnOtherSide = devOnOtherSide->GetNode ();
     NS_TEST_ASSERT_MSG_EQ (nodeOnOtherSide, (*nodeItr), "Node at other end of link not as expected at iteration " << i);
 
-    atEnd = (devItr == devs2.End ());
-    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "device iterator reached end earlier than expected!");
-    devItr++;
+    atEnd = (ifaceItr == ifaces2.End ());
+    NS_TEST_ASSERT_MSG_EQ (atEnd, false, "iface iterator reached end earlier than expected!");
+    ifaceItr++;
 
     // nodes 
     atEnd = (nodeItr == nodes2.End ());
@@ -1816,8 +1815,8 @@ void TestPathRetrieval::DoRun (void)
   }
   atEnd = (nodeItr == nodes2.End ());
   NS_TEST_ASSERT_MSG_EQ (atEnd, true, "node iterator didn't reach end: must be too many nodes?");
-  atEnd = (devItr == devs2.End ());
-  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "dev iterator didn't reach end: must be too many devices?");
+  atEnd = (ifaceItr == ifaces2.End ());
+  NS_TEST_ASSERT_MSG_EQ (atEnd, true, "iface iterator didn't reach end: must be too many interfaces?");
 }
 
 
