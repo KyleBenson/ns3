@@ -46,6 +46,7 @@ main (int argc, char *argv[])
   std::string latencyFile = "";
   std::string locationFile = "";
   std::string disaster_location = "Los Angeles, CA";
+  std::string npaths = "1";
   bool tracing = false;
   double timeout = 1.0;
 
@@ -77,6 +78,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("timeout", "Seconds to wait for server reply before attempting contact through the overlay.", timeout);
   cmd.AddValue ("contact_attempts", "Number of times a reporting node will attempt to contact the server "
                 "(it will use the overlay after the first attempt).  Default is 1 (no overlay).", exp->contactAttempts);
+  cmd.AddValue ("npaths", "Number of diverse paths a node will use when sending data over the multipath overlay", npaths);
 
   cmd.Parse (argc,argv);
 
@@ -91,6 +93,14 @@ main (int argc, char *argv[])
        tokIter != tokens.end(); ++tokIter)
     {
       failureProbabilities->push_back (boost::lexical_cast<double> (*tokIter));
+    }
+
+  std::vector<uint32_t> * npathsSelections = new std::vector<uint32_t> ();
+  tokens = tokenizer(npaths, sep);
+  for (tokenizer::iterator tokIter = tokens.begin();
+       tokIter != tokens.end(); ++tokIter)
+    {
+      npathsSelections->push_back (boost::lexical_cast<uint32_t> (*tokIter));
     }
 
   std::vector<std::string> * disasterLocations = new std::vector<std::string> ();
@@ -138,6 +148,7 @@ main (int argc, char *argv[])
         {
           ObjectFactory * fact = new ObjectFactory ();
           fact->SetTypeId (heuristicMap[*tokIter]);
+          //TODO: use 'Set (std::string name, const AttributeValue &value)' for heuristic params
           heuristics->push_back (fact);
         }
     }
@@ -163,6 +174,7 @@ main (int argc, char *argv[])
   exp->disasterLocations = disasterLocations;
   exp->failureProbabilities = failureProbabilities;
   exp->SetTimeout (Seconds (timeout));
+  exp->npaths = npathsSelections;
 
   /*exp->ReadLatencyFile (latencyFile);
   exp->ReadLocationFile (locationFile);

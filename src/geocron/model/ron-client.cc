@@ -69,6 +69,10 @@ RonClient::GetTypeId (void)
                    MakeUintegerAccessor (&RonClient::SetDataSize,
                                          &RonClient::GetDataSize),
                    MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("MultipathFanout", "Number of multiple paths to send a message out on when using the overlay",
+                   UintegerValue (1),
+                   MakeUintegerAccessor (&RonClient::m_multipathFanout),
+                   MakeUintegerChecker<uint32_t> ())
     .AddTraceSource ("Send", "A new packet is created and is sent to the server or an overlay node",
                      MakeTraceSourceAccessor (&RonClient::m_sendTrace))
     .AddTraceSource ("Ack", "An ACK packet originating from the server is received",
@@ -139,6 +143,7 @@ void
 RonClient::DoDispose (void)
 {
   NS_LOG_FUNCTION_NOARGS ();
+  StopApplication ();
   Application::DoDispose ();
 }
 
@@ -337,9 +342,11 @@ RonClient::Send (bool viaOverlay)
 {
   NS_LOG_FUNCTION_NOARGS ();
 
+  NS_ASSERT_MSG (m_heuristic, "m_heuristic is NULL! Can't run a RonClient without a heuristic!");
+
   NS_LOG_LOGIC ("Sending " << (viaOverlay ? "indirect" : "direct") << " packet.");
 
-  Ptr<Packet> p;
+  Ptr<Packet> p1;
   if (m_dataSize)
     {
       //
@@ -350,7 +357,7 @@ RonClient::Send (bool viaOverlay)
       //
       NS_ASSERT_MSG (m_dataSize == m_size, "RonClient::Send(): m_size and m_dataSize inconsistent");
       NS_ASSERT_MSG (m_data, "RonClient::Send(): m_dataSize but no m_data");
-      p = Create<Packet> (m_data, m_dataSize);
+      p1 = Create<Packet> (m_data, m_dataSize);
     }
   else
     {
@@ -361,58 +368,73 @@ RonClient::Send (bool viaOverlay)
       // this case, we don't worry about it either.  But we do allow m_size
       // to have a value different from the (zero) m_dataSize.
       //
-      p = Create<Packet> (m_size);
+      p1 = Create<Packet> (m_size);
     }
 
-  //TODO: handle choosing from multiple servers
-  Ptr<RonPeerEntry> serverPeer = *(m_serverPeers->Begin ());
+  // send a message to each of the available servers
+  for (RonPeerTable::Iterator serverItr = m_serverPeers->Begin ();
+      serverItr != m_serverPeers->End (); serverItr++)
+  {
+    Ptr<RonPeerEntry> serverPeer = *serverItr;
 
-  // add RON header to packet
-  Ptr<RonHeader> head = Create<RonHeader> ();
-  uint32_t seq = m_sent;
-  Ptr<RonPath> overlayPeerChoices;
+    // Here we'll gather all the overlay peers we will use in multipath messaging
+    RonPathHeuristic::RonPathContainer overlayPeerChoices;
 
-  // If forwarding thru overlay, use heuristic to pick a peer from those available
-  if (viaOverlay)
+    // If forwarding thru overlay, use heuristic to pick a peer from those available
+    if (viaOverlay)
     {
       try
-        {
-          overlayPeerChoices = m_heuristic->GetBestPath (Create<PeerDestination> (serverPeer));
-          head = Create<RonHeader> ();
-          head->SetPath (overlayPeerChoices);
-          //TODO: FIX THIS BUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          //for whatever reason, it doesn't work in the CheckTimeout function... something wrong with the way we reverse the header and send it back?  looks like it's because the server pops the header, reverses it, and puts it in the packet for the way back.  this will erase a lot of information about the peers so we should really just get around to actually to storing the entire peer entry (at least const parts of them) in the header path...
-m_heuristic->NotifyTimeout (overlayPeerChoices, Simulator::Now ());
-        }
+      {
+        overlayPeerChoices = m_heuristic->GetBestMultiPath (Create<PeerDestination> (serverPeer), m_multipathFanout);
+        //TODO: FIX THIS BUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //for whatever reason, it doesn't work in the CheckTimeout function... something wrong with the way we reverse the header and send it back?  looks like it's because the server pops the header, reverses it, and puts it in the packet for the way back.  this will erase a lot of information about the peers so we should really just get around to actually to storing the entire peer entry (at least const parts of them) in the header path...
+        //basically I think we need to build a RonPath that contains the actual peer entries so that they'll compare to be the same; could probably test this by adding the header, popping it off, and comparing the extracted path with the original
+        //for now, only use the timeout mechanism when we're allowing
+        //multiple contact attempts as we don't currently support
+        //that along with multipath
+        if (m_count > 1)
+          m_heuristic->NotifyTimeout (overlayPeerChoices.front (), Simulator::Now ());
+      }
       catch (RonPathHeuristic::NoValidPeerException& e)
-        {
-          NS_LOG_LOGIC ("Node " << GetNode ()->GetId () << " has no more overlay peers to choose.");
-          //NS_LOG_DEBUG (e.what ());
-          CancelEvents ();
-          return;
-        }
+      {
+        NS_LOG_LOGIC ("Node " << GetNode ()->GetId () << " has no more overlay peers to choose.");
+        //NS_LOG_DEBUG (e.what ());
+        CancelEvents ();
+        return;
+      }
     }
-  else
-    head->SetDestination (serverPeer->address);
 
-  head->SetSeq (seq);
-  head->SetOrigin (m_address);
-  p->AddHeader (*head);
+    // We need to send a packet for each overlay path as well as along
+    // the regular path to the destination, but the latter only if we
+    // have not sent such a message before
+    uint32_t totalPacketsToSend = overlayPeerChoices.size ();
+    if (!m_sent)
+      totalPacketsToSend++;
 
-  // call to the trace sinks before the packet is actually sent,
-  // so that tags added to the packet can be sent as well
-  m_sendTrace (p, GetNode ()->GetId ());
-  m_socket->SendTo (p, 0, InetSocketAddress(head->GetNextDest (), m_port));
-  ScheduleTimeout (head);
-  m_sent++;
-
-  //NS_LOG_INFO ("Sent " << m_size << " bytes to " << m_servAddress);
-
-  // Currently we only attempt direct contact once
-  /*if (m_sent < m_count) 
+    for (uint32_t i = 0; i < totalPacketsToSend; i++)
     {
-      ScheduleTransmit (m_interval);
-      }*/
+      Ptr<RonHeader> head = Create<RonHeader> ();
+      head->SetOrigin (m_address);
+      Ptr<Packet> p = p1->Copy ();
+
+      // Do the multipath overlay peers first, then the regular path on last iteration
+      if (i < overlayPeerChoices.size ())
+        head->SetPath (overlayPeerChoices[i]);
+      else
+        head->SetDestination (serverPeer->address);
+
+      head->SetSeq (m_sent);
+      p->AddHeader (*head);
+
+      // call to the trace sinks before the packet is actually sent,
+      // so that tags added to the packet can be sent as well
+      m_sendTrace (p, GetNode ()->GetId ());
+      m_socket->SendTo (p, 0, InetSocketAddress(head->GetNextDest (), m_port));
+      ScheduleTimeout (head);
+      NS_LOG_DEBUG ("Sent " << m_sent << "th packet out of " << m_count << " max");
+      m_sent++;
+    }
+  }
 }
 
 void 
@@ -580,6 +602,9 @@ RonClient::CheckTimeout (Ptr<RonHeader> head)
       m_heuristic->NotifyTimeout (path, time);
       
       // try again?
+      //TODO: how to handle multi-path messages when m_count > 1??
+      //maybe a CheckMultipathTimeout that looks to see if ANY of the
+      //RonHeaders in a list of them have been ACKed?
       if (m_sent < m_count)
         ScheduleTransmit (Seconds (0.0), true);
     }

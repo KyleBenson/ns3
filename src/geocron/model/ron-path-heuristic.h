@@ -56,8 +56,11 @@ public:
   RonPathHeuristic ();
   virtual ~RonPathHeuristic ();
 
+  typedef std::vector<Ptr<RonPath> > RonPathContainer;
   /** Return the best path, according to the aggregate heuristics, to the destination. */
   Ptr<RonPath> GetBestPath (Ptr<PeerDestination> destination);
+  /** Return the best multi-path, according to the aggregate heuristics, to the destination. */
+  RonPathContainer GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout);
 
   /** Return the best multicast path, according to the aggregate heuristics, to the destinations. */
   //TODO: Ptr<RonPath> GetBestMulticastPath (itr<Ptr<RonPeerEntry???> destinations);

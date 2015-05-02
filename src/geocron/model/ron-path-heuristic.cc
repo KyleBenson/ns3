@@ -237,6 +237,19 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 }
 
 
+RonPathHeuristic::RonPathContainer
+RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout)
+{
+  RonPathContainer result;
+  for (; multipathFanout > 0; multipathFanout--)
+  {
+    //TODO: decide how to tell heuristic that it shouldn't give us this same path again, possibly without using NotifyTimeout???
+    result.push_back (GetBestPath (destination));
+  }
+  return result;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////  notifications / updates  /////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////

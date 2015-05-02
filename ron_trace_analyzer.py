@@ -137,11 +137,9 @@ def normalizedTimes(nNodes, timeCounts):
     '''Takes a node count and a TraceRun or TraceGroup getXTimes() function output (2-tuple) as input and
     returns the normalized form of the outputs (divides each data point by the node count).'''
 
-    #NOTE: shouldn't the avg. delivery ratio be (1/n)*sum((1/m)*sum(1 if delivered else 0 for each node in run i)
     # where is the node count coming from?  won't each run have potentially
     # different node counts?
 
-    #return (timeCounts[0], timeCounts[1])
     return (timeCounts[0], [c/float(nNodes) for c in timeCounts[1]])
 
 
@@ -227,10 +225,12 @@ class TraceRun:
     A single simulation run from one file. Holds the nodes and performs calculations.
     '''
     # Indices of important data in case trace files change
+    NODE_TYPE_INDEX = 0
     NODE_ID_INDEX = 1
     ACTION_INDEX = 2
     DIRECT_ACK_INDEX = 3
     TIME_INDEX = 6
+    FROM_NODE_INDEX = 9
 
     TIME_RESOLUTION = 0.01 #In seconds
 
@@ -259,6 +259,10 @@ class TraceRun:
             for line in f.readlines():
                 parsed = line.split()
                 nodeId = parsed[TraceRun.NODE_ID_INDEX]
+                try:
+                    fromNodeId = parsed[TraceRun.FROM_NODE_INDEX]
+                except IndexError:
+                    fromNodeId = None
                 node = self.nodes.get(nodeId)
 
                 if len(parsed) > TraceRun.TIME_INDEX:
@@ -301,9 +305,9 @@ class TraceRun:
                 # Rather than consider only ACKs, we also consider the
                 # server simply receiving packets as sometimes it will
                 # do so but is unable to properly ACK the message
-                if 'received' in line and nodeId not in self.nodesHeardFrom:
+                if parsed[TraceRun.NODE_TYPE_INDEX] == 'Server' and 'received' == parsed[TraceRun.ACTION_INDEX] and fromNodeId and fromNodeId not in self.nodesHeardFrom:
                     self.recvTimes[time] = self.recvTimes.get(time, 0) + 1
-                    self.nodesHeardFrom[nodeId] = time
+                    self.nodesHeardFrom[fromNodeId] = time
 
                 if 'forwarded' == parsed[TraceRun.ACTION_INDEX]:
                     node.forwards += 1
@@ -681,8 +685,6 @@ if __name__ == '__main__':
         markers = 'x.*+do^s1_|'
         for i,g in enumerate(traceGroups):
             plt.plot(*cumulative(normalizedTimes(g.getNNodes(), g.getRecvTimes())), label=g.name, marker=markers[i%len(markers)])
-            #plt.plot(*cumulative(normalizedTimes(g.getNNodes(), g.getAckTimes())), label=g.name, marker=markers[i%len(markers)])
-            #plt.plot(*cumulative(g.getAckTimes()), label=g.name, marker=markers[i%len(markers)]) #not normalyized
 
         # If requested, plot the ACKs for the non-RON case, which is just a horizontal line of the number of direct ACKs
         if args.non_ron:

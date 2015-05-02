@@ -80,6 +80,7 @@ public:
   std::vector<ObjectFactory*> * heuristics;
   std::vector<Location> * disasterLocations;
   std::vector<double> * failureProbabilities;
+  std::vector<uint32_t> * npaths;
   //TODO: timeouts, max retries, etc.
 
   // These are public to allow a command line parser to set them
@@ -108,6 +109,7 @@ private:
   ObjectFactory* currHeuristic;
   Location currLocation;
   double currFprob;
+  uint32_t currNpaths; //current multipath fanout
   uint32_t currRun; //keep at 32 as it's used as a string later
   Time timeout;
   Time simulationLength;
@@ -117,6 +119,7 @@ private:
   ApplicationContainer serverApps;
   Ptr<RonPeerTable> overlayPeers;
   Ptr<RonPeerTable> serverPeers;
+  Ptr<Node> serverNode; //TODO: make this serverNodes
   std::string topologyFile;
 
   // name of topology generator/reader, and a helper for assigning regions

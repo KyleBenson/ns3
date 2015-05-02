@@ -62,12 +62,14 @@ GeocronExperiment::GeocronExperiment ()
   currLocation = "";
   currFprob = 0.0;
   currRun = 0;
+  currNpaths = 1;
   contactAttempts = 10;
   traceFile = "";
   nruns = 1;
   nServerChoices = 10;
 
   regionHelper = NULL;
+  serverNode = NULL;
 }
 
 
@@ -457,16 +459,21 @@ GeocronExperiment::RunAllScenarios ()
           SetFailureProbability (*fprob);
           for (currRun = 0; currRun < nruns; currRun++)
             {
-              // We want to compare each heuristic to each other for each configuration of failures
+              // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
+              // to each other for each configuration of failures
               ApplyFailureModel ();
               SetNextServers ();
-              for (uint32_t h = 0; h < heuristics->size (); h++)
+              for (uint32_t p = 0; p < npaths->size (); p++)
+              {
+                for (uint32_t h = 0; h < heuristics->size (); h++)
                 {
                   currHeuristic = heuristics->at (h);
+                  currNpaths = npaths->at (p);
                   SeedManager::SetRun(runSeed++);
                   AutoSetTraceFile ();
                   Run ();
                 }
+              }
               UnapplyFailureModel ();
             }
         }
@@ -756,7 +763,6 @@ GeocronExperiment::UnapplyFailureModel () {
       UnfailNode (*node, appStopTime);
     }
 
-
   clientApps.Start (Seconds (2.0));
   clientApps.Stop (appStopTime);
 }
@@ -766,9 +772,36 @@ void
 GeocronExperiment::SetNextServers () {
   NS_LOG_LOGIC ("Choosing from " << serverNodeCandidates[currLocation].GetN () << " server provider candidates.");
 
-  Ptr<Node> serverNode = (serverNodeCandidates[currLocation].GetN () ?
-                          serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)) :
-                          nodes.Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1)));
+  // If we've previously installed a RonServer Application on some node(s),
+  // we should remove all instances so they won't conflict with new ones if
+  // we happen to choose the same serverNode twice in a simulation.
+  if (serverNode)
+  {
+    for (uint32_t i = 0; i < serverNode->GetNApplications (); i++)
+    {
+      Ptr<Application> app = serverNode->GetApplication (i);
+      if (DynamicCast<RonServer> (app))
+      {
+        NS_LOG_LOGIC ("Removing server app from node " << serverNode->GetId ());
+        Ptr<Application> removedApp = serverNode->RemoveApplication (i);
+        NS_ASSERT_MSG (DynamicCast<RonServer> (removedApp), "Removed app was not a RonServer!");
+        break;
+      }
+    }
+  }
+
+  // Choose the server node at random from those available.
+  // If none in this region, pick from the global list of nodes at random.
+  if (serverNodeCandidates[currLocation].GetN ())
+  {
+    serverNode = serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1));
+  }
+  else
+  {
+    uint32_t nodeIndex = random->GetInteger (0, nodes.GetN ());
+    NS_LOG_LOGIC ("No servers in this region, so using node at random: " << nodeIndex);
+    serverNode = nodes.Get (nodeIndex);
+  }
 
   NS_LOG_INFO ("Server is Node " << serverNode->GetId () <<
       " at location " << serverNode->GetObject<RonPeerEntry> ()->region);
@@ -776,10 +809,17 @@ GeocronExperiment::SetNextServers () {
   //Application
   RonServerHelper ronServer (9);
 
+  if (serverNode->GetNApplications ())
+  {
+    Ptr<RonClient> clientApp = DynamicCast<RonClient> (serverNode->GetApplication (0));
+    if (clientApp)
+      NS_ASSERT_MSG (true, "RonClient and RonServer on same node.  This is unsupported behavior!");
+  }
   serverApps = ronServer.Install (serverNode);
   serverApps.Start (Seconds (1.0));
   serverApps.Stop (appStopTime);
 
+  // save all the servers so we can tell the clients where they are
   serverPeers = Create<RonPeerTable> ();
   serverPeers->AddPeer (serverNode);
 }
@@ -812,6 +852,7 @@ GeocronExperiment::Run ()
         //TODO: have the random be part of the object factory/attributes?
         //TODO: just define it as the input to the sim?
         Ptr<RonPathHeuristic> heuristic = currHeuristic->Create<RonPathHeuristic> ();
+        NS_ASSERT_MSG (heuristic, "Created heuristic is NULL! Bad heuristic name?");
         // Must set heuristic first so that source will be set and heuristic can make its heap
         heuristic->MakeTopLevel (); //must always do this! TODO: not need to?
 
@@ -827,6 +868,7 @@ GeocronExperiment::Run ()
         //heuristic->AddHeuristic (randHeuristic);
 
         ronClient->SetAttribute ("MaxPackets", UintegerValue (contactAttempts));
+        ronClient->SetAttribute ("MultipathFanout", UintegerValue (currNpaths));
         numDisasterPeers++;
       }
     }

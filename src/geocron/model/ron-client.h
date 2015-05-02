@@ -176,6 +176,7 @@ private:
   void ScheduleTimeout (Ptr<RonHeader> head);
 
   uint32_t m_count;
+  uint32_t m_multipathFanout;
   Time m_interval;
   uint32_t m_size;
 
