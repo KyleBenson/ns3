@@ -38,10 +38,16 @@ cd $NS3_DIR
 git checkout geocron
 git reset --hard HEAD
 
-./waf configure --enable-examples --enable-tests
-./waf build
-./test.py
+# setup BRITE first
+cd BRITE
+make
+cd ..
+ln -s $PWD/BRITE ../BRITE
+
+# now build and test everything
+./waf configure --enable-examples --enable-tests --disable-python  --enable-modules=geocron
+./waf build -j 8
+./run_tests.py
 #ln -s ~/ron_output ron_output
 
-#TODO: this reminder automatically...
-echo "Don't forget to use the '--with-brite' option after downloading it and recompile!"
+echo "To use the PyViz visualizer, reconfigure without the --disable-python argument and rebuild"
