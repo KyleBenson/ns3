@@ -99,6 +99,10 @@ def parse_args(args):
     # Control waf/build
     parser.add_argument('--optimized', '-o', action="store_true",
                         help='''Configure waf in optimized mode before building.''')
+    parser.add_argument('--extra_args',
+                        help='''Pass additional args to ns-3. NOTE: you
+                        need to put quotes around the arguments or else this
+                        program may interpret them as additional arguments!''')
 
     # Control UI
     parser.add_argument('--debug', '-d', action="store_true",
@@ -194,6 +198,9 @@ def makecmds(args):
             # first, ns3 typeId system configurations
             cmd += '--ns3::GeocronExperiment::TopologyType=%s ' % args.topology_type
 
+            if args.extra_args:
+                cmd += args.extra_args + ' '
+
             # individual parameters
             if args.disasters != default_disasters:
                 disasters = ('"%s"' % '-'.join(args.disasters))
@@ -219,8 +226,9 @@ def makecmds(args):
             cmd += '--npaths=%s ' % npaths
 
             # static args
-            cmd += "--latencies=rocketfuel/weights/all_latencies.intra "
-            cmd += "--locations=rocketfuel/city_locations.txt "
+            if args.topology_type == 'rocketfuel':
+                cmd += "--latencies=rocketfuel/weights/all_latencies.intra "
+                cmd += "--locations=rocketfuel/city_locations.txt "
             cmd += "--timeout=0.5 "
 
             ## $$$$ NO LONGER ASSUME SPACES " " AFTER COMMANDS!
