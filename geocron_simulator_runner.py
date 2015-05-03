@@ -110,8 +110,8 @@ def parse_args(args):
     parser.add_argument('--visualize', action="store_true",
                         help='''run with PyViz visualizer''')
     parser.add_argument('--verbose', '-v', nargs='?',
-                        default=default_verbosity_level, type=int,
-                        help='''run with verbose printing (default=%(default)s when no arg given)''')
+                        const=default_verbosity_level, default=0, type=int,
+                        help='''run with verbose printing (default=%(const)s when no arg given)''')
     parser.add_argument('--log', '-l', nargs='+',
                         help='''Specify ns-3 logging components to enable through waf.'''
                         '''Example: RonClientApplication[=func|warn|prefix_[node|time|func|level]]'''
