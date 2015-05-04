@@ -30,6 +30,7 @@ RonPathHeuristic::RonPathHeuristic ()
   m_masterLikelihoods = NULL;
   m_pathsBuilt = false;
   m_topLevel = NULL;
+  m_peers = NULL;
 }
 
 TypeId
@@ -142,16 +143,17 @@ RonPathHeuristic::BuildPaths (Ptr<PeerDestination> destination)
 void
 RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
 {
-  if (m_pathsBuilt)
+  if (m_topLevel->m_pathsBuilt or m_pathsBuilt)
     return;
 
-  RonPeerEntry sourcePeer = *GetSourcePeer ();
+  Ptr<RonPeerEntry> sourcePeer = GetSourcePeer ();
+  NS_ASSERT_MSG (m_peers, "peer table in heuristic is NULL!");
   for (RonPeerTable::Iterator peerItr = m_peers->Begin ();
        peerItr != m_peers->End (); peerItr++)
     {
       //make sure not to have loops!
       //TODO: check all pieces of destination
-      if (*(*peerItr) == *(*destination->Begin ()) or *(*peerItr) == sourcePeer)
+      if (*(*peerItr) == *(*destination->Begin ()) or *(*peerItr) == *sourcePeer)
         continue;
       Ptr<RonPath> path = Create<RonPath> ();
       path->AddHop (Create<PeerDestination> (*peerItr));
@@ -196,6 +198,15 @@ RonPathHeuristic::DoUpdateLikelihoods (const Ptr<PeerDestination> destination)
 }
 
 
+void
+RonPathHeuristic::ForceUpdateLikelihoods (const Ptr<PeerDestination> destination)
+{
+  m_updatedOnce = false;
+  m_pathsAttempted.clear ();
+  UpdateLikelihoods (destination);
+}
+
+
 Ptr<RonPath>
 RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 {
@@ -204,8 +215,6 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
   NS_ASSERT_MSG (m_masterLikelihoods, "Master likelihood table missing!  " \
                  "Make sure you aggregate heuristics to the top-level one first (before lower-levels) " \
                  "so that the shared data structures are properly organized.");
-
-  //TODO: multiple servers
 
   // ensure paths built
   BuildPaths (destination);
@@ -222,22 +231,23 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 
   NS_LOG_LOGIC ("Choosing best path of " << (*m_masterLikelihoods)[destination].size () << " possibilities");
   MasterPathLikelihoodInnerTable::iterator probs = (*m_masterLikelihoods)[destination].begin ();
-  Ptr<RonPath> bestPath = probs->first;
-  double bestLikelihood = probs->second->GetLh ();
+  Ptr<RonPath> bestPath = NULL;
+  double bestLikelihood = 0;
   for (; probs != (*m_masterLikelihoods)[destination].end (); probs++)
     {
       double nextLh = probs->second->GetLh ();
-      if (nextLh > bestLikelihood)
+      // NOTE: we shouldn't return a path we've already attempted
+      if (nextLh > bestLikelihood and !PathAttempted (probs->first))
         {
           bestPath = probs->first;
           bestLikelihood = nextLh;
         }
     }
 
-  if (bestLikelihood <= 0.0)
+  if (bestLikelihood <= 0.0 or bestPath == NULL)
     throw NoValidPeerException();
 
-  m_pathsAttempted.insert (bestPath);
+  PathAttempted (bestPath, true);
   return (bestPath);
 }
 
@@ -251,7 +261,8 @@ RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t m
   for (; multipathFanout > 0; multipathFanout--)
   {
     //TODO: decide how to tell heuristic that it shouldn't give us this same path again, possibly without using NotifyTimeout???
-    result.push_back (GetBestPath (destination));
+    Ptr<RonPath> nextDest = GetBestPath (destination);
+    result.push_back (nextDest);
   }
   return result;
 }

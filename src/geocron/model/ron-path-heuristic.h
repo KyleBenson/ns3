@@ -151,6 +151,9 @@ public:
   virtual void DoUpdateLikelihoods (Ptr<PeerDestination> destination);
   /** Ensures that DoUpdateLikelihoods is run for each aggregate heuristic */
   void UpdateLikelihoods (Ptr<PeerDestination> destination);
+  /** Normally, UpdateLikelihoods is only run once.  This forces an immediate update,
+   * which will also clear the m_pathsAttempted. */
+  void ForceUpdateLikelihoods (Ptr<PeerDestination> destination);
 
   bool SameRegion (Ptr<RonPeerEntry> peer1, Ptr<RonPeerEntry> peer2);
 

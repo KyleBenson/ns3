@@ -767,6 +767,30 @@ TestRonPathHeuristic::DoRun (void)
       NS_TEST_ASSERT_MSG_EQ (npaths, nExpectedPeers, npaths << " peers were checked for same region rather than " <<nExpectedPeers);
     }
 
+  /////////////  Test multiple destinations ////////////////
+
+  // reset heuristic's likelihoods first
+  h0->ForceUpdateLikelihoods (dest);
+  RonPathHeuristic::RonPathContainer paths = h0->GetBestMultiPath (dest, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "should have gotten 2 paths for multipath!");
+  equality = *paths[0] == *paths[1];
+  NS_TEST_ASSERT_MSG_NE (equality, true, "the two paths from GetBestMultiPath should not be the same!");
+
+  // verify that getting another round of paths doesn't return duplicate either
+  RonPathHeuristic::RonPathContainer nextPaths = h0->GetBestMultiPath (dest, 1);
+  equality = *paths[0] == *nextPaths[0];
+  NS_TEST_ASSERT_MSG_NE (equality, true, "second round of paths from GetBestMultiPath should have the same peers!");
+  equality = *paths[1] == *nextPaths[0];
+  NS_TEST_ASSERT_MSG_NE (equality, true, "second round of paths from GetBestMultiPath should have the same peers!");
+
+  // verify that requesting too many paths throws an exception
+  try
+  {
+    h0->GetBestMultiPath (dest, 999999999);
+    NS_TEST_ASSERT_MSG_EQ (true, false, "requesting too many paths from GetBestMultiPath should throw exception!");
+  }
+  catch (RonPathHeuristic::NoValidPeerException e)
+    {}
 
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////  dangerous: testing the inner structs /////////////////////
@@ -796,9 +820,6 @@ TestRonPathHeuristic::DoRun (void)
 
   NS_TEST_ASSERT_MSG_EQ_TOL ((*h0->m_masterLikelihoods)[Create<PeerDestination> (peers.back())][path]->GetLh (), 0.5,
                              0.01, "testing m_masterLikelihoods accessing with fresh copies of keys");
-  //path->AddHop (
-
-  //TODO: multiple destinations
 }
 
 
@@ -1347,7 +1368,10 @@ TestIdealRonPathHeuristic::DoRun (void)
   NS_TEST_ASSERT_MSG_NE (equality, true, "path1 should not equal path2!");
 
   Ptr<IdealRonPathHeuristic> ideal = CreateObject<IdealRonPathHeuristic> ();
-  ideal->SetPeerTable (RonPeerTable::GetMaster ());
+  Ptr<RonPeerTable> peers = Create<RonPeerTable> ();
+  peers->AddPeer (GridGenerator::GetPeer (4, 0));
+  peers->AddPeer (GridGenerator::GetPeer (0, 4));
+  ideal->SetPeerTable (peers);
   ideal->SetSourcePeer (srcPeer);
   ideal->MakeTopLevel ();
 
@@ -1376,17 +1400,11 @@ TestIdealRonPathHeuristic::DoRun (void)
   if (*path == *path1)
     gotTopRight = false;
 
-  // verify we get the same path again before failing the nodes
-  Ptr<RonPath> lastPath = path;
-  path = ideal->GetBestPath (dest);
-  equality = *path == *lastPath;
-  NS_TEST_ASSERT_MSG_EQ (equality, true, "Should have got same path again without calling Timeout!");
-
   // now, we want to fail the overlay node it chose before, force an update, and verify that the other node is returned next
+  Ptr<RonPath> lastPath = path;
   nodeToFail = (*((*lastPath->Begin ())->Begin ()))->node;
   FailNode (nodeToFail);
-  ideal->m_updatedOnce = false; //TODO: this with a function?
-  ideal->UpdateLikelihoods (dest);
+  ideal->ForceUpdateLikelihoods (dest);
 
   double lh = ((ideal->m_likelihoods))[dest][path]->GetLh ();
   NS_TEST_ASSERT_MSG_EQ (lh, 0.0, "likelihood of failed path should be 0, but got " << lh);
@@ -1395,6 +1413,9 @@ TestIdealRonPathHeuristic::DoRun (void)
 
   // now we should be getting the other path
   path = ideal->GetBestPath (dest);
+
+  equality = *path == *lastPath;
+  NS_TEST_ASSERT_MSG_NE (equality, true, "should not have gotten the same path after failing one!");
 
   // now it should be the other one
   if (gotTopRight) {
@@ -1408,8 +1429,7 @@ TestIdealRonPathHeuristic::DoRun (void)
   // Fail this other node and then we should get an Exception since no Paths will have LH > 0!
   nodeToFail = (*((*path->Begin ())->Begin ()))->node;
   FailNode (nodeToFail);
-  ideal->m_updatedOnce = false; //TODO: this with a function?
-  ideal->UpdateLikelihoods (dest);
+  ideal->ForceUpdateLikelihoods (dest);
 
   try {
     lastPath = path;
@@ -1424,8 +1444,7 @@ TestIdealRonPathHeuristic::DoRun (void)
 
   // let's unfail this node and verify that we get the last path again
   UnfailNode (nodeToFail);
-  ideal->m_updatedOnce = false; //TODO: this with a function?
-  ideal->UpdateLikelihoods (dest);
+  ideal->ForceUpdateLikelihoods (dest);
   lastPath = path;
   path = ideal->GetBestPath (dest);
   equality = (*path) == (*lastPath);
@@ -1465,8 +1484,7 @@ TestIdealRonPathHeuristic::DoRun (void)
   {
     nodeToFail = *nodeItr;
     FailNode (nodeToFail);
-    ideal->m_updatedOnce = false; //TODO: this with a function?
-    ideal->UpdateLikelihoods (dest);
+    ideal->ForceUpdateLikelihoods (dest);
     try {
       lastPath = path;
       path = ideal->GetBestPath (dest);
@@ -1493,8 +1511,7 @@ TestIdealRonPathHeuristic::DoRun (void)
     {
       FailIpv4 (ipv4, nDevs);
     }
-    ideal->m_updatedOnce = false; //TODO: this with a function?
-    ideal->UpdateLikelihoods (dest);
+    ideal->ForceUpdateLikelihoods (dest);
     try {
       lastPath = path;
       path = ideal->GetBestPath (dest);

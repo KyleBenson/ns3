@@ -219,7 +219,7 @@ RonHeader::GetPath () const
     //peer->address = (Ipv4Address)(uint32_t)0;
   //}
 
-  NS_ASSERT_MSG (peer, "In GetPath, final destination peer at " << (Ipv4Address)GetFinalDest () << " couldn't be found in master table.");
+  NS_ASSERT_MSG (peer, "In GetPath, final destination peer at " << GetFinalDest () << " couldn't be found in master table.");
 
   path->AddHop (peer);
   return path;
