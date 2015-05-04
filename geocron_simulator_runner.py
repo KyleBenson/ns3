@@ -107,6 +107,8 @@ def parse_args(args):
     # Control UI
     parser.add_argument('--debug', '-d', action="store_true",
                         help='''run simulator through GDB''')
+    parser.add_argument('--valgrind', action="store_true",
+                        help='''run simulator with valgrind to debug memory errors''')
     parser.add_argument('--visualize', action="store_true",
                         help='''run with PyViz visualizer''')
     parser.add_argument('--verbose', '-v', nargs='?',
@@ -193,6 +195,11 @@ def makecmds(args):
             cmd = "./waf --run %s --command-template='" % 'geocron-example' #was 'ron'
             if args.debug:
                 cmd += "gdb --args "
+            if args.valgrind:
+                cmd += "valgrind -v --leak-check=full "
+            if args.valgrind and args.debug:
+                print("using both valgrind and debug not supported!")
+                system.exit()
             cmd += r'%s '
 
             # first, ns3 typeId system configurations
