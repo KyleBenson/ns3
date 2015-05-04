@@ -194,7 +194,7 @@ def makecmds(args):
 
             cmd = "./waf --run %s --command-template='" % 'geocron-example' #was 'ron'
             if args.debug:
-                cmd += "gdb --args "
+                cmd += "gdb -ex run --args "
             if args.valgrind:
                 cmd += "valgrind -v --leak-check=full "
             if args.valgrind and args.debug:

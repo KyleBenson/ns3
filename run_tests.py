@@ -1,4 +1,2 @@
 #!/bin/bash
-./test.py -s geocron -v -t .results.txt
-less .results.txt
-rm .results.txt
+./waf --run test-runner --command-template='gdb -ex run -ex quit --args %s --suite=geocron --verbose'
