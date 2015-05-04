@@ -80,6 +80,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("contact_attempts", "Number of times a reporting node will attempt to contact the server "
                 "(it will use the overlay after the first attempt).  Default is 1 (no overlay).", exp->contactAttempts);
   cmd.AddValue ("npaths", "Number of diverse paths a node will use when sending data over the multipath overlay", npaths);
+  cmd.AddValue ("nservers", "Number of servers to activate that nodes will report to", exp->nServers);
 
   cmd.Parse (argc,argv);
 
@@ -187,6 +188,11 @@ main (int argc, char *argv[])
   exp->IndexNodes ();
   //exp->SetTraceFile (traceFile);
   exp->RunAllScenarios ();
+
+  delete heuristics;
+  delete disasterLocations;
+  delete failureProbabilities;
+  delete npathsSelections;
 
   return 0;
 }

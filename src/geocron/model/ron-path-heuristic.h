@@ -168,6 +168,7 @@ public:
   std::string m_summaryName;
   std::string m_shortName;
   double m_weight;
+  bool m_pathsBuilt;
 
   /** This  helps us aggregate the likelihoods together from each of the
       aggregate heuristics. */

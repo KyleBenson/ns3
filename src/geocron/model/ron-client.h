@@ -146,6 +146,7 @@ public:
   /**
    * Add the specified host to the list of potential servers
    * to contact.
+   * WARNING: careful doing this if you are sharing PeerTables between apps!
    * \param peer Smart Pointer to peer to be added
    */
   void AddServerPeer (Ptr<RonPeerEntry> peer);

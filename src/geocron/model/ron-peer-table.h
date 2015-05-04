@@ -49,14 +49,11 @@ public:
   uint32_t id;
   Ipv4Address address;
   Ptr<Node> node;
-  Time lastContact;
-  //TODO: label enum for grouping?
 
   //Geocron Attributes
   Vector location;
   Location region;
-  //TODO: failures reported counter / timer
-};  
+};
 
 class RonPeerTable : public SimpleRefCount<RonPeerTable>
 {
@@ -80,10 +77,14 @@ class RonPeerTable : public SimpleRefCount<RonPeerTable>
 
   uint32_t GetN () const;
 
-  /** Returns old entry if it existed, else new one. */
+  /** Returns old entry, as indexed by id, if it existed, else new one. */
   Ptr<RonPeerEntry> AddPeer (Ptr<RonPeerEntry> entry);
   /** Returns old entry if it existed, else new one. */
   Ptr<RonPeerEntry> AddPeer (Ptr<Node> node);
+  /** Add all of the nodes, but doesn't keep track of which were new or not. **/
+  void AddPeers (NodeContainer nodes);
+  /** Add all of the peers, avoiding duplicates, but doesn't keep track of which were new or not. **/
+  void AddPeers (Ptr<RonPeerTable> peers);
   /** Returns true if entry existed. */
   bool RemovePeer (uint32_t id);
   /** Returns requested entry, NULL if unavailable. Use IsInTable to verify its prescence in the table. */

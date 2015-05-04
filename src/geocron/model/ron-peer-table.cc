@@ -24,6 +24,8 @@
 
 using namespace ns3;
 
+NS_LOG_COMPONENT_DEFINE ("RonPeerTable");
+
 RonPeerEntry::RonPeerEntry () {}
 
 RonPeerEntry::RonPeerEntry (Ptr<Node> node)
@@ -34,8 +36,6 @@ RonPeerEntry::RonPeerEntry (Ptr<Node> node)
 
     NS_ASSERT_MSG (address.Get () != (uint32_t)0, "got a 0 Ipv4Address!");
 
-    lastContact = Simulator::Now ();
-    
     Ptr<MobilityModel> mobility = node->GetObject<MobilityModel> ();
     NS_ASSERT_MSG (mobility != NULL, "Geocron nodes need MobilityModels for determining locations!");    
     location = mobility->GetPosition ();
@@ -125,15 +125,17 @@ Ptr<RonPeerEntry>
 RonPeerTable::AddPeer (Ptr<RonPeerEntry> entry)
 {
   Ptr<RonPeerEntry> returnValue;
+  // If this peer already exists in the table, update the pointer with the new object
   if (m_peers.count (entry->id) != 0)
     {
       Ptr<RonPeerEntry> temp = (*(m_peers.find (entry->id))).second;
       m_peers[entry->id] = entry;
       returnValue = temp;
+      NS_LOG_LOGIC ("Changing peer " << entry->id << " with address " << entry->address << " in table.");
     }
   else
     returnValue = m_peers[entry->id] = entry;
-  
+
   m_peersByAddress[(entry->address.Get ())] = entry;
 
   return returnValue;
@@ -144,7 +146,37 @@ Ptr<RonPeerEntry>
 RonPeerTable::AddPeer (Ptr<Node> node)
 {
   Ptr<RonPeerEntry> newEntry = Create<RonPeerEntry> (node);
+  //Ptr<RonPeerEntry> newEntry = GetMaster ()->GetPeer (node->GetId ());
+  //if (newEntry == NULL)
+  //{
+    //newEntry = Create<RonPeerEntry> (node);
+    // Cache the peer we create here since we're assuming PeerEntries are essentially const objects
+    //GetMaster ()->AddPeer (newEntry);
+    //NS_LOG_LOGIC ("Caching peer with ID " << newEntry->id << " and IP address " << newEntry->address);
+  //}
   return AddPeer (newEntry);
+}
+
+
+void
+RonPeerTable::AddPeers (NodeContainer nodes)
+{
+  for (NodeContainer::Iterator nodeItr = nodes.Begin ();
+      nodeItr != nodes.End (); nodeItr++)
+  {
+    AddPeer (*nodeItr);
+  }
+}
+
+
+void
+RonPeerTable::AddPeers (Ptr<RonPeerTable> peers)
+{
+  for (RonPeerTable::Iterator itr = peers->Begin ();
+      itr != peers->End (); itr++)
+  {
+    AddPeer (*itr);
+  }
 }
 
 

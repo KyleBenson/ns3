@@ -33,6 +33,7 @@
 
 #include "ron-trace-functions.h"
 #include "ron-client.h"
+#include "failure-helper-functions.h"
 
 namespace ns3 {
 
@@ -189,7 +190,7 @@ RonClient::StartApplication (void)
   //TODO: properly bootstrap from the server
   if (m_address.Get () == 0)
     {
-      m_address = GetNode ()->GetObject<Ipv4> ()->GetAddress (1,0).GetLocal ();
+      m_address = GetNodeAddress (GetNode ());
     }
 
   m_socket->SetRecvCallback (MakeCallback (&RonClient::HandleRead, this));
@@ -343,8 +344,15 @@ RonClient::Send (bool viaOverlay)
   NS_LOG_FUNCTION_NOARGS ();
 
   NS_ASSERT_MSG (m_heuristic, "m_heuristic is NULL! Can't run a RonClient without a heuristic!");
+  NS_ASSERT_MSG (m_count <= 1 or m_multipathFanout <= 1, "Using retries AND multipath is currently unsupported!");
 
-  NS_LOG_LOGIC ("Sending " << (viaOverlay ? "indirect" : "direct") << " packet.");
+  std::string pathType = viaOverlay ? "indirect" : "direct";
+  if (m_multipathFanout > 1)
+  {
+    pathType = "multipath";
+    viaOverlay = true; //so that overlay peers will be chosen too
+  }
+  NS_LOG_LOGIC ("Sending " << pathType << " packet.");
 
   Ptr<Packet> p1;
   if (m_dataSize)
@@ -385,19 +393,16 @@ RonClient::Send (bool viaOverlay)
     {
       try
       {
-        overlayPeerChoices = m_heuristic->GetBestMultiPath (Create<PeerDestination> (serverPeer), m_multipathFanout);
-        //TODO: FIX THIS BUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        //for whatever reason, it doesn't work in the CheckTimeout function... something wrong with the way we reverse the header and send it back?  looks like it's because the server pops the header, reverses it, and puts it in the packet for the way back.  this will erase a lot of information about the peers so we should really just get around to actually to storing the entire peer entry (at least const parts of them) in the header path...
-        //basically I think we need to build a RonPath that contains the actual peer entries so that they'll compare to be the same; could probably test this by adding the header, popping it off, and comparing the extracted path with the original
-        //for now, only use the timeout mechanism when we're allowing
-        //multiple contact attempts as we don't currently support
-        //that along with multipath
-        if (m_count > 1)
-          m_heuristic->NotifyTimeout (overlayPeerChoices.front (), Simulator::Now ());
+        // NOTE: multipathFanout is -1 as we consider the normal path to be one of the paths
+        // if we are going to send to that one as well this round
+        uint32_t nChoices = m_multipathFanout;
+        if (m_sent == 0)
+          nChoices--;
+        overlayPeerChoices = m_heuristic->GetBestMultiPath (Create<PeerDestination> (serverPeer), nChoices);
       }
       catch (RonPathHeuristic::NoValidPeerException& e)
       {
-        NS_LOG_LOGIC ("Node " << GetNode ()->GetId () << " has no more overlay peers to choose.");
+        NS_LOG_LOGIC ("Node " << GetNode ()->GetId () << " has no more overlay peers to choose out of " << m_peers->GetN () << " possible options.");
         //NS_LOG_DEBUG (e.what ());
         CancelEvents ();
         return;
@@ -414,7 +419,6 @@ RonClient::Send (bool viaOverlay)
     for (uint32_t i = 0; i < totalPacketsToSend; i++)
     {
       Ptr<RonHeader> head = Create<RonHeader> ();
-      head->SetOrigin (m_address);
       Ptr<Packet> p = p1->Copy ();
 
       // Do the multipath overlay peers first, then the regular path on last iteration
@@ -423,7 +427,15 @@ RonClient::Send (bool viaOverlay)
       else
         head->SetDestination (serverPeer->address);
 
+      NS_ASSERT_MSG (head->GetFinalDest () == serverPeer->address,
+          "Server address is not the final destination in this RonHeader!");
+
       head->SetSeq (m_sent);
+      // WARNING: this may cause potential issues when a client has multiple
+      // interfaces as we've arbitrarily chosen m_address from them.  However,
+      // we need to do something as otherwise we won't recognize the IP address
+      // as a valid RonPeerEntry upon receiving an ACK and calling GetPath ()
+      head->SetOrigin (m_address);
       p->AddHeader (*head);
 
       // call to the trace sinks before the packet is actually sent,
@@ -431,7 +443,7 @@ RonClient::Send (bool viaOverlay)
       m_sendTrace (p, GetNode ()->GetId ());
       m_socket->SendTo (p, 0, InetSocketAddress(head->GetNextDest (), m_port));
       ScheduleTimeout (head);
-      NS_LOG_DEBUG ("Sent " << m_sent << "th packet out of " << m_count << " max");
+      NS_LOG_DEBUG ("Sent " << m_sent << "th packet out of " << m_count << " max to server at " << head->GetFinalDest ());
       m_sent++;
     }
   }
@@ -507,7 +519,7 @@ RonClient::ProcessAck (Ptr<Packet> packet, Ipv4Address source)
   RonHeader head;
   packet->PeekHeader (head);
   uint32_t seq = head.GetSeq ();
-  
+
   m_ackTrace (packet, GetNode ()-> GetId ());
   m_outstandingSeqs.erase (seq);
   //TODO: handle an ack from an old seq number
@@ -517,10 +529,6 @@ RonClient::ProcessAck (Ptr<Packet> packet, Ipv4Address source)
   Ptr<RonPath> path = head.GetPath ();
 
   NS_ASSERT_MSG (path->GetN () > 0, "got 0 length path from Header in ProcessAck");
-
-  //need to set destination's address explicitly as we currently don't have everything in the master table
-  //TODO: fix this
-  (*path->GetDestination ()->Begin ())->address = source;
 
   m_heuristic->NotifyAck (path, time);
 
@@ -589,18 +597,13 @@ RonClient::CheckTimeout (Ptr<RonHeader> head)
   // If it's timed out, we should try a different path to the server
   if (itr != m_outstandingSeqs.end ())
     {
-      NS_LOG_LOGIC ("Packet with seq# " << seq << " timed out.");
+      Ptr<RonPath> path = head->GetPath ();
+      NS_LOG_LOGIC ("Packet with seq# " << seq << " destined for " << head->GetFinalDest () << " timed out.");
       m_outstandingSeqs.erase (itr);
 
       Time time = Simulator::Now ();
-      Ptr<RonPath> path = head->GetPath ();
-
-      //need to set destination's address explicitly as we currently don't have everything in the master table
-      //TODO: fix this
-      (*path->GetDestination ()->Begin ())->address = m_serverPeers->GetPeerByAddress (head->GetFinalDest ())->address;
-
       m_heuristic->NotifyTimeout (path, time);
-      
+
       // try again?
       //TODO: how to handle multi-path messages when m_count > 1??
       //maybe a CheckMultipathTimeout that looks to see if ANY of the

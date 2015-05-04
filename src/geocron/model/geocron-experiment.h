@@ -89,6 +89,7 @@ public:
   uint32_t nruns;
   uint32_t start_run_number;
   std::size_t seed; // for generating topology files
+  uint32_t nServers; // number of servers to activate that nodes will report to
 
   /** Builds various indices for choosing different node types of interest.
       Chooses links/nodes that may be failed during disaster simulation.
@@ -119,8 +120,9 @@ private:
   ApplicationContainer clientApps;
   ApplicationContainer serverApps;
   Ptr<RonPeerTable> overlayPeers;
+  Ptr<RonPeerTable> allPeers;
   Ptr<RonPeerTable> serverPeers;
-  Ptr<Node> serverNode; //TODO: make this serverNodes
+  NodeContainer serverNodes;
   std::string topologyFile;
 
   // name of topology generator/reader, and a helper for assigning regions

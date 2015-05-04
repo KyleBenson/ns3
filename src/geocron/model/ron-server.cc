@@ -128,8 +128,9 @@ RonServer::HandleRead (Ptr<Socket> socket)
           // If this is the first hop on the route, we need to set the source
           // since NS3 doesn't give us a convenient way to access which interface
           // the original packet was sent out on.
-          if (head.GetHop () == 0 and not head.IsForward ())
-            head.SetOrigin (InetSocketAddress::ConvertFrom (from).GetIpv4 ());
+          // NOTE: this has been temporarily resolved by calling head->SetOrigin (m_address) in RonClient.cc
+          //if (head.GetHop () == 0 and not head.IsForward ())
+            //head.SetOrigin (InetSocketAddress::ConvertFrom (from).GetIpv4 ());
 
           NS_LOG_INFO (head);
 
@@ -148,7 +149,10 @@ RonServer::HandleRead (Ptr<Socket> socket)
                        InetSocketAddress::ConvertFrom (from).GetIpv4 () <<
                        " on behalf of " << head.GetFinalDest ());
 
-          socket->SendTo (packet, 0, from);
+          // NOTE: make sure we use the destination from the RonHeader as otherwise
+          // we may not have seen this IP address before and we'll cause a crash
+          // when trying to extract the RonPath on the other side
+          socket->SendTo (packet, 0, head.GetFinalDest ());
         }
     }
 }

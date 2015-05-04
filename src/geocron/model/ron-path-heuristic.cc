@@ -28,6 +28,8 @@ NS_OBJECT_ENSURE_REGISTERED (RonPathHeuristic);
 RonPathHeuristic::RonPathHeuristic ()
 {
   m_masterLikelihoods = NULL;
+  m_pathsBuilt = false;
+  m_topLevel = NULL;
 }
 
 TypeId
@@ -63,6 +65,8 @@ RonPathHeuristic::GetTypeId (void)
 
 RonPathHeuristic::~RonPathHeuristic ()
 {
+  if (m_topLevel == this)
+    delete m_masterLikelihoods;
 } //required to keep gcc from complaining
 
 
@@ -105,6 +109,7 @@ RonPathHeuristic::AddPath (Ptr<RonPath> path)
           newLh = lh->AddLh (0.0);
         }
       m_likelihoods[dest][path] = newLh;
+
       // Then recurse to the lower-level heuristics
       for (AggregateHeuristics::iterator others = m_aggregateHeuristics.begin ();
            others != m_aggregateHeuristics.end (); others++)
@@ -137,12 +142,9 @@ RonPathHeuristic::BuildPaths (Ptr<PeerDestination> destination)
 void
 RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
 {
-  // All aggregate heuristics should know about the likelihood table, so we only need
-  // to check if any one heuristic has built paths once, i.e. if the table contains anything.
-  PathLikelihoodInnerTable * table = &(m_likelihoods[destination]);
-  if (table->size ())
+  if (m_pathsBuilt)
     return;
-  
+
   RonPeerEntry sourcePeer = *GetSourcePeer ();
   for (RonPeerTable::Iterator peerItr = m_peers->Begin ();
        peerItr != m_peers->End (); peerItr++)
@@ -154,8 +156,10 @@ RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
       Ptr<RonPath> path = Create<RonPath> ();
       path->AddHop (Create<PeerDestination> (*peerItr));
       path->AddHop (destination);
-      AddPath (path);
+      EnsurePathRegistered (path);
     }
+  NS_LOG_LOGIC ("Created " << (*m_masterLikelihoods)[destination].size () << " paths");
+  m_pathsBuilt = true;
   /*NS_ASSERT_MSG (m_likelihoods[destination].size () == m_peers->GetN () - 2,
     "we should have two less paths than peers now...");*/
 }
@@ -216,6 +220,7 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 
   UpdateLikelihoods (destination);
 
+  NS_LOG_LOGIC ("Choosing best path of " << (*m_masterLikelihoods)[destination].size () << " possibilities");
   MasterPathLikelihoodInnerTable::iterator probs = (*m_masterLikelihoods)[destination].begin ();
   Ptr<RonPath> bestPath = probs->first;
   double bestLikelihood = probs->second->GetLh ();
@@ -240,6 +245,8 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 RonPathHeuristic::RonPathContainer
 RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout)
 {
+  NS_ASSERT_MSG (multipathFanout > 0, "multipathFanout <= 0, this won't return any peer choices!");
+
   RonPathContainer result;
   for (; multipathFanout > 0; multipathFanout--)
   {

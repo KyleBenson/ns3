@@ -45,6 +45,14 @@ GeocronExperiment::GetTypeId ()
             StringValue ("ns3::UniformRandomVariable"),
             MakePointerAccessor (&GeocronExperiment::random),
             MakePointerChecker<RandomVariableStream> ())
+    .AddAttribute ("NumberServersChoices",
+            "Number of servers to index based on their being external to disaster regions."
+            "This number should of course be bigger than --nservers,"
+            "but GeocronExperiment will increase this value to"
+            "accomodate a larger nservers value.",
+            IntegerValue (10),
+            MakeIntegerAccessor (&GeocronExperiment::nServerChoices),
+            MakeIntegerChecker<uint32_t> ())
   ;
   return tid;
 }
@@ -54,7 +62,8 @@ GeocronExperiment::GeocronExperiment ()
 {
   appStopTime = Time (Seconds (30.0));
   simulationLength = Seconds (10.0);
-  overlayPeers = RonPeerTable::GetMaster ();
+  overlayPeers = Create<RonPeerTable> ();
+  allPeers = RonPeerTable::GetMaster ();
 
   maxNDevs = 5;
   //cmd.AddValue ("install_stubs", "If not 0, install RON client only on stub nodes (have <= specified links - 1 (for loopback dev))", maxNDevs);
@@ -66,11 +75,11 @@ GeocronExperiment::GeocronExperiment ()
   contactAttempts = 10;
   traceFile = "";
   nruns = 1;
-  nServerChoices = 10;
   seed = 0;
+  nServers = 1;
+  start_run_number = 0;
 
   regionHelper = NULL;
-  serverNode = NULL;
 }
 
 
@@ -606,7 +615,8 @@ GeocronExperiment::IndexNodes () {
       if (IsOverlayNode (*node)) 
         {
           overlayNodes.Add (*node);
-          overlayPeers->AddPeer (*node);
+          Ptr<RonPeerEntry> newEntry = overlayPeers->AddPeer (*node);
+          allPeers->AddPeer (newEntry);
         }
 
       // ROUTING NODES
@@ -777,54 +787,88 @@ GeocronExperiment::SetNextServers () {
 
   // If we've previously installed a RonServer Application on some node(s),
   // we should remove all instances so they won't conflict with new ones if
-  // we happen to choose the same serverNode twice in a simulation.
-  if (serverNode)
+  // we happen to choose the same serverNodes twice in a simulation.
+  if (serverNodes.GetN ())
   {
-    for (uint32_t i = 0; i < serverNode->GetNApplications (); i++)
+    for (NodeContainer::Iterator nodeItr = serverNodes.Begin ();
+        nodeItr != serverNodes.End (); nodeItr++)
     {
-      Ptr<Application> app = serverNode->GetApplication (i);
-      if (DynamicCast<RonServer> (app))
+      Ptr<Node> serverNode = *nodeItr;
+      for (uint32_t i = 0; i < serverNode->GetNApplications (); i++)
       {
-        NS_LOG_LOGIC ("Removing server app from node " << serverNode->GetId ());
-        Ptr<Application> removedApp = serverNode->RemoveApplication (i);
-        NS_ASSERT_MSG (DynamicCast<RonServer> (removedApp), "Removed app was not a RonServer!");
-        break;
+        Ptr<Application> app = serverNode->GetApplication (i);
+        if (DynamicCast<RonServer> (app))
+        {
+          NS_LOG_LOGIC ("Removing server app from node " << serverNode->GetId ());
+          Ptr<Application> removedApp = serverNode->RemoveApplication (i);
+          NS_ASSERT_MSG (DynamicCast<RonServer> (removedApp), "Removed app was not a RonServer!");
+          break;
+        }
       }
     }
   }
 
-  // Choose the server node at random from those available.
-  // If none in this region, pick from the global list of nodes at random.
-  if (serverNodeCandidates[currLocation].GetN ())
-  {
-    serverNode = serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1));
-  }
-  else
-  {
-    uint32_t nodeIndex = random->GetInteger (0, nodes.GetN ());
-    NS_LOG_LOGIC ("No servers in this region, so using node at random: " << nodeIndex);
-    serverNode = nodes.Get (nodeIndex);
-  }
+  // Clear all of the previous round's server nodes since we pick new ones each time
+  serverNodes = NodeContainer ();
 
-  NS_LOG_INFO ("Server is Node " << serverNode->GetId () <<
-      " at location " << serverNode->GetObject<RonPeerEntry> ()->region);
+  // Choose the server nodes at random from those available.
+  // If none in this region, pick from the global list of nodes at random.
+  bool useCandidates = serverNodeCandidates[currLocation].GetN () ? true : false;
+
+  Ptr<Node> nextServerNode;
+  for (uint32_t i = 0; i < nServers; i++)
+  {
+    if (useCandidates)
+    {
+      nextServerNode = serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1));
+    }
+    else
+    {
+      uint32_t nodeIndex = random->GetInteger (0, nodes.GetN ());
+      NS_LOG_DEBUG ("No servers in this region, so using node at random: " << nodeIndex);
+      nextServerNode = nodes.Get (nodeIndex);
+    }
+
+    serverNodes.Add (nextServerNode);
+
+    NS_LOG_INFO ("Server is Node " << nextServerNode->GetId () <<
+          " at location " << nextServerNode->GetObject<RonPeerEntry> ()->region);
+  }
 
   //Application
   RonServerHelper ronServer (9);
 
-  if (serverNode->GetNApplications ())
+// Do some error checking when not optimized
+#ifdef NS3_LOG_ENABLE
+  for (NodeContainer::Iterator nodeItr = serverNodes.Begin ();
+      nodeItr != serverNodes.End (); nodeItr++)
   {
-    Ptr<RonClient> clientApp = DynamicCast<RonClient> (serverNode->GetApplication (0));
-    if (clientApp)
-      NS_ASSERT_MSG (true, "RonClient and RonServer on same node.  This is unsupported behavior!");
+    Ptr<Node> serverNode = *nodeItr;
+    if (serverNode->GetNApplications ())
+    {
+      Ptr<RonClient> clientApp = DynamicCast<RonClient> (serverNode->GetApplication (0));
+      if (clientApp)
+        NS_ASSERT_MSG (true, "RonClient and RonServer on same node.  This is unsupported behavior!");
+    }
   }
-  serverApps = ronServer.Install (serverNode);
+#endif
+
+  serverApps = ronServer.Install (serverNodes);
   serverApps.Start (Seconds (1.0));
   serverApps.Stop (appStopTime);
 
   // save all the servers so we can tell the clients where they are
   serverPeers = Create<RonPeerTable> ();
-  serverPeers->AddPeer (serverNode);
+  serverPeers->AddPeers (serverNodes);
+
+  allPeers->AddPeers (serverPeers);
+#ifdef NS3_LOG_ENABLE
+  for (RonPeerTable::Iterator itr = serverPeers->Begin ();
+      itr != serverPeers->End (); itr++)
+  {
+    NS_LOG_DEBUG ("Caching server peer with ID " << (*itr)->id << " and IP address " << (*itr)->address);
+  }
+#endif
 }
 
 
@@ -902,8 +946,6 @@ GeocronExperiment::Run ()
   NS_LOG_INFO ("Next simulation run...");
   NS_LOG_UNCOND ("========================================================================");
 
-  //serverNode->GetObject<Ipv4NixVectorRouting> ()->FlushGlobalNixRoutingCache ();
-  
   // reset apps
   for (ApplicationContainer::Iterator app = clientApps.Begin ();
        app != clientApps.End (); app++)

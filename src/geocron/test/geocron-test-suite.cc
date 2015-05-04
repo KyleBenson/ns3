@@ -1082,6 +1082,7 @@ TestRonHeader::DoRun (void)
 
   Ptr<RonHeader> head0 = Create<RonHeader> ();
   head0->SetDestination (addr0);
+  head0->SetOrigin (addr2);
   Ptr<RonHeader> head1 = Create<RonHeader> (addr1);
   Ptr<RonHeader> head2 = Create<RonHeader> (addr2, addr1);
 
@@ -1128,6 +1129,8 @@ TestRonHeader::DoRun (void)
   Ipv4Address prevHop = head2->GetNextDest ();
   NS_TEST_ASSERT_MSG_EQ (head2->GetFinalDest (), srcAddr, "testing proper origin after reversing");
   NS_TEST_ASSERT_MSG_EQ (head2->GetNextDest (), prevHop, "testing proper next hop after reversing");
+  NS_TEST_ASSERT_MSG_NE (head2->GetFinalDest (), (Ipv4Address)(uint32_t)0, "final destination is 0 after reverse!");
+  NS_TEST_ASSERT_MSG_NE (head2->GetOrigin (), (Ipv4Address)(uint32_t)0, "origin is 0 after reverse!");
 
   //undo reverse
   head2->ReversePath ();
@@ -1172,6 +1175,8 @@ TestRonHeader::DoRun (void)
   path->AddHop (peers->GetPeerByAddress (addr0), path->Begin ());
   equality = *path == *head0->GetPath ();
   NS_TEST_ASSERT_MSG_EQ (equality, true, "Checking path equality after modifying both path and header");
+  NS_TEST_ASSERT_MSG_NE (head0->GetFinalDest (), (Ipv4Address)(uint32_t)0, "final destination is 0 after double reverse!");
+  NS_TEST_ASSERT_MSG_NE (head0->GetOrigin (), (Ipv4Address)(uint32_t)0, "origin is 0 after double reverse!");
 
   //TODO: test iterators
 
@@ -1185,12 +1190,21 @@ TestRonHeader::DoRun (void)
   NS_TEST_ASSERT_MSG_EQ (head0->GetSeq (), tmpHead.GetSeq (), "testing assignment operator");
   NS_TEST_ASSERT_MSG_EQ (head0->GetHop (), tmpHead.GetHop (), "testing assignment operator");
   NS_TEST_ASSERT_MSG_EQ (head0->IsForward (), tmpHead.IsForward (), "testing assignment operator");
+  equality = tmpHead.GetFinalDest () == (Ipv4Address)(uint32_t)0;
+  NS_TEST_ASSERT_MSG_NE (equality, true, "final destination is 0!");
 
-  equality = *head0->GetPath () == *tmpHead.GetPath ();
+  Ptr<RonPath> path1, path2;
+  path1 = head0->GetPath ();
+  path2 = tmpHead.GetPath ();
+  equality = *path1 == *path2;
   NS_TEST_ASSERT_MSG_EQ (equality, true, "testing deserialized packet path");
 
   head0->ReversePath ();
-  equality = *head0->GetPath () == *tmpHead.GetPath ();
+  NS_TEST_ASSERT_MSG_NE (head0->GetFinalDest (), (Ipv4Address)(uint32_t)0, "final destination is 0 after reverse!");
+  NS_TEST_ASSERT_MSG_NE (head0->GetOrigin (), (Ipv4Address)(uint32_t)0, "origin is 0 after reverse!");
+  path1 = head0->GetPath ();
+  path2 = tmpHead.GetPath ();
+  equality = *path1 == *path2;
   NS_TEST_ASSERT_MSG_EQ (equality, false, "testing deserialized packet path false positive after reverse");
 }
 

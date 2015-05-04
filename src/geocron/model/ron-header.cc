@@ -200,6 +200,7 @@ RonHeader::GetPathEnd () const
 Ptr<RonPath>
 RonHeader::GetPath () const
 {
+  // Add each of the peers' IP addresses, looked up using the RonPeerTable master table, to a RonPath object
   Ptr<RonPath> path = Create<RonPath> ();
   Ptr<RonPeerEntry> peer;
   for (PathIterator addrItr = GetPathBegin ();
@@ -209,11 +210,17 @@ RonHeader::GetPath () const
       NS_ASSERT_MSG (peer != NULL, "null peer in master table with address " << *addrItr);
       path->AddHop (peer);
     }
-  //TODO: properly get the right destination peer
   peer = RonPeerTable::GetMaster ()->GetPeerByAddress ((Ipv4Address)GetFinalDest ());
 
-  if (peer == NULL)
-    peer = Create<RonPeerEntry> ();
+  //if (GetFinalDest ().Get () == 0)
+  //{
+    //NS_LOG_WARN ("Final destination in RonHeader is 0.0.0.0!  Returning a dummy final destination in GetPath ()");
+    //peer = CreateObject<RonPeerEntry> ();
+    //peer->address = (Ipv4Address)(uint32_t)0;
+  //}
+
+  NS_ASSERT_MSG (peer, "In GetPath, final destination peer at " << (Ipv4Address)GetFinalDest () << " couldn't be found in master table.");
+
   path->AddHop (peer);
   return path;
 }
