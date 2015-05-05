@@ -466,6 +466,10 @@ RonClient::HandleRead (Ptr<Socket> socket)
           RonHeader head;
           packet->PeekHeader (head);
 
+          NS_LOG_LOGIC ("Client at " << m_address << " handling packet from " 
+              << source << " with final destination " << head.GetFinalDest ()
+              << " and next destination " << head.GetNextDest ());
+
           // If the packet is for us, process the ACK
           if (head.GetFinalDest () == head.GetNextDest ())
             {
@@ -475,6 +479,8 @@ RonClient::HandleRead (Ptr<Socket> socket)
           // Else forward it
           else
             {
+              NS_ASSERT_MSG (head.GetFinalDest () != m_address,
+                  "forwarding packet destined for us!  What's wrong here?");
               ForwardPacket (packet, source);
               //TODO: ACK the partial path
               //TODO: update last-contacted info
@@ -499,12 +505,16 @@ RonClient::ForwardPacket (Ptr<Packet> packet, Ipv4Address source)
   // If this is the first hop on the route, we need to set the source
   // since NS3 doesn't give us a convenient way to access which interface
   // the original packet was sent out on.
-  if (head.GetHop () == 0)
-    head.SetOrigin (source);
+  // TEMPORARILY RESOLVED BY SETTING ORIGIN IN RonClient.cc:Send()
+  //if (head.GetHop () == 0)
+    //head.SetOrigin (source);
 
   head.IncrHops ();
   Ipv4Address destination = head.GetNextDest ();
   packet->AddHeader (head);
+
+  NS_ASSERT_MSG (head.GetNextDest () != m_address,
+      "forwarding packet destined for us!  What's wrong here?");
 
   m_forwardTrace (packet, GetNode ()-> GetId ());
   m_socket->SendTo (packet, 0, InetSocketAddress(destination, m_port));
@@ -514,7 +524,7 @@ RonClient::ForwardPacket (Ptr<Packet> packet, Ipv4Address source)
 void
 RonClient::ProcessAck (Ptr<Packet> packet, Ipv4Address source)
 {
-  NS_LOG_LOGIC ("ACK received");
+  NS_LOG_LOGIC ("ACK received from " << source);
 
   RonHeader head;
   packet->PeekHeader (head);
