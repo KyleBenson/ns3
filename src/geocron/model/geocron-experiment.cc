@@ -683,7 +683,7 @@ GeocronExperiment::IndexNodes () {
       clientApps.Add (newApp);
       Ptr<RonClient> newClient = DynamicCast<RonClient> (newApp.Get (0));
       newClient->SetAttribute ("MaxPackets", UintegerValue (0)); //explicitly enable sensor reporting when disaster area set
-      newClient->SetPeerTable (overlayPeers); //TODO: make this part of the helper?? or some p2p overlay algorithm? or the table itself? give out a callback function with that nodes peers?
+      newClient->SetPeerTable (GetPeerTableForPeer ((*node)->GetObject<RonPeerEntry> ()));
     }
   
   clientApps.Start (Seconds (2.0));
@@ -869,6 +869,13 @@ GeocronExperiment::SetNextServers () {
     NS_LOG_DEBUG ("Caching server peer with ID " << (*itr)->id << " and IP address " << (*itr)->address);
   }
 #endif
+}
+
+
+Ptr<RonPeerTable>
+GeocronExperiment::GetPeerTableForPeer (Ptr<RonPeerEntry> peer)
+{
+  return overlayPeers;
 }
 
 

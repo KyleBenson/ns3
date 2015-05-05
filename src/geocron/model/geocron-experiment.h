@@ -76,6 +76,7 @@ public:
   void NextHeuristic ();
   void NextDisasterLocation ();
   void NextFailureProbability ();
+  Ptr<RonPeerTable> GetPeerTableForPeer (Ptr<RonPeerEntry> peer);
 
   std::vector<ObjectFactory*> * heuristics;
   std::vector<Location> * disasterLocations;
@@ -93,7 +94,6 @@ public:
 
   /** Builds various indices for choosing different node types of interest.
       Chooses links/nodes that may be failed during disaster simulation.
-      //TODO: build disaster nodes, servers index
   */
   void IndexNodes ();
 
