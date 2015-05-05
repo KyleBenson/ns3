@@ -57,6 +57,7 @@ public:
   /** Returns the path represented in the RonHeader as a sequence of IP addresses. */
   PathIterator GetPathBegin () const;
   PathIterator GetPathEnd () const;
+  /** Returns full path, including final destination. */
   Ptr<RonPath> GetPath () const;
   void SetPath (Ptr<RonPath> path);
 

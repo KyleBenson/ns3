@@ -379,6 +379,7 @@ RonClient::Send (bool viaOverlay)
       p1 = Create<Packet> (m_size);
     }
 
+  bool shouldSendDirect = m_sent == 0;
   // send a message to each of the available servers
   for (RonPeerTable::Iterator serverItr = m_serverPeers->Begin ();
       serverItr != m_serverPeers->End (); serverItr++)
@@ -396,16 +397,20 @@ RonClient::Send (bool viaOverlay)
         // NOTE: multipathFanout is -1 as we consider the normal path to be one of the paths
         // if we are going to send to that one as well this round
         uint32_t nChoices = m_multipathFanout;
-        if (m_sent == 0)
+        if (shouldSendDirect)
           nChoices--;
         overlayPeerChoices = m_heuristic->GetBestMultiPath (Create<PeerDestination> (serverPeer), nChoices);
       }
       catch (RonPathHeuristic::NoValidPeerException& e)
       {
-        NS_LOG_LOGIC ("Node " << GetNode ()->GetId () << " has no more overlay peers to choose out of " << m_peers->GetN () << " possible options.");
+        NS_LOG_LOGIC ("Node " << GetNode ()->GetId () << " has no more overlay peers to choose out of " << m_peers->GetN () << " possible options."
+            << (shouldSendDirect ? " Still sending one packet directly." : ""));
         //NS_LOG_DEBUG (e.what ());
-        CancelEvents ();
-        return;
+        if (!shouldSendDirect)
+        {
+          CancelEvents ();
+          return;
+        }
       }
     }
 
@@ -413,7 +418,7 @@ RonClient::Send (bool viaOverlay)
     // the regular path to the destination, but the latter only if we
     // have not sent such a message before
     uint32_t totalPacketsToSend = overlayPeerChoices.size ();
-    if (!m_sent)
+    if (shouldSendDirect)
       totalPacketsToSend++;
 
     for (uint32_t i = 0; i < totalPacketsToSend; i++)
@@ -421,14 +426,24 @@ RonClient::Send (bool viaOverlay)
       Ptr<RonHeader> head = Create<RonHeader> ();
       Ptr<Packet> p = p1->Copy ();
 
-      // Do the multipath overlay peers first, then the regular path on last iteration
-      if (i < overlayPeerChoices.size ())
-        head->SetPath (overlayPeerChoices[i]);
+      // Do the regular path first, then the multipath overlay peers
+      // on subsequent iterations
+      if (i != 0)
+        head->SetPath (overlayPeerChoices[i-1]);
       else
         head->SetDestination (serverPeer->address);
 
       NS_ASSERT_MSG (head->GetFinalDest () == serverPeer->address,
           "Server address is not the final destination in this RonHeader!");
+      if (m_sent == 0)
+      {
+        NS_ASSERT_MSG (!head->IsForward (), "Shouldn't be sending an indirect packet if m_sent == 0!");
+      }
+      else
+      {
+        NS_ASSERT_MSG (overlayPeerChoices[i-1]->GetN () > 1, "Shouldn't have a <2-length path when sending an indirect packet! It's length " << overlayPeerChoices[i-1]->GetN ());
+        NS_ASSERT_MSG (head->IsForward (), "Shouldn't be sending a direct packet when m_sent != 0!  It's " << m_sent);
+      }
 
       head->SetSeq (m_sent);
       // WARNING: this may cause potential issues when a client has multiple
@@ -467,8 +482,7 @@ RonClient::HandleRead (Ptr<Socket> socket)
           packet->PeekHeader (head);
 
           NS_LOG_LOGIC ("Client at " << m_address << " handling packet from " 
-              << source << " with final destination " << head.GetFinalDest ()
-              << " and next destination " << head.GetNextDest ());
+              << source << " with final destination " << head.GetFinalDest ());
 
           // If the packet is for us, process the ACK
           if (head.GetFinalDest () == head.GetNextDest ())
@@ -524,11 +538,12 @@ RonClient::ForwardPacket (Ptr<Packet> packet, Ipv4Address source)
 void
 RonClient::ProcessAck (Ptr<Packet> packet, Ipv4Address source)
 {
-  NS_LOG_LOGIC ("ACK received from " << source);
-
   RonHeader head;
   packet->PeekHeader (head);
   uint32_t seq = head.GetSeq ();
+
+  NS_LOG_LOGIC ("ACK received from server at " << head.GetOrigin () <<
+      (head.IsForward () ? " via overlay at " : ". Source: ") << source);
 
   m_ackTrace (packet, GetNode ()-> GetId ());
   m_outstandingSeqs.erase (seq);
@@ -540,7 +555,14 @@ RonClient::ProcessAck (Ptr<Packet> packet, Ipv4Address source)
 
   NS_ASSERT_MSG (path->GetN () > 0, "got 0 length path from Header in ProcessAck");
 
-  m_heuristic->NotifyAck (path, time);
+  // Only time out overlay packets!  The Client app handles the logic for
+  // when to send direct packets, not the heuristics!
+  if (head.IsForward ())
+  {
+    NS_ASSERT_MSG (head.GetPath ()->GetN () > 1, "indirect header has <2 length (" << head.GetPath ()->GetN () << ") in ProcessAck!");
+    Time time = Simulator::Now ();
+    m_heuristic->NotifyAck (path, time);
+  }
 
   CancelEvents ();
   //TODO: store path? send more data?
@@ -611,8 +633,14 @@ RonClient::CheckTimeout (Ptr<RonHeader> head)
       NS_LOG_LOGIC ("Packet with seq# " << seq << " destined for " << head->GetFinalDest () << " timed out.");
       m_outstandingSeqs.erase (itr);
 
-      Time time = Simulator::Now ();
-      m_heuristic->NotifyTimeout (path, time);
+      // Only time out overlay packets!  The Client app handles the logic for
+      // when to send direct packets, not the heuristics!
+      if (head->IsForward ())
+      {
+        NS_ASSERT_MSG (head->GetPath ()->GetN () > 1, "indirect header has <2 length (" << head->GetPath ()->GetN () << ") in CheckTimeout!");
+        Time time = Simulator::Now ();
+        m_heuristic->NotifyTimeout (path, time);
+      }
 
       // try again?
       //TODO: how to handle multi-path messages when m_count > 1??

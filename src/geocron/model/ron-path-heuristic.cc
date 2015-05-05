@@ -158,6 +158,7 @@ RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
       Ptr<RonPath> path = Create<RonPath> ();
       path->AddHop (Create<PeerDestination> (*peerItr));
       path->AddHop (destination);
+      NS_ASSERT_MSG (path->GetN () > 1, "Built path of length " << path->GetN () << ", which is no good!");
       EnsurePathRegistered (path);
     }
   NS_LOG_LOGIC ("Created " << (*m_masterLikelihoods)[destination].size () << " paths");
@@ -262,6 +263,7 @@ RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t m
   {
     //TODO: decide how to tell heuristic that it shouldn't give us this same path again, possibly without using NotifyTimeout???
     Ptr<RonPath> nextDest = GetBestPath (destination);
+    NS_ASSERT_MSG (nextDest->GetN () > 1, "Got path of length " << nextDest->GetN () << " in GetBestMultiPath, which is no good!");
     result.push_back (nextDest);
   }
   return result;
@@ -288,6 +290,8 @@ RonPathHeuristic::NotifyAck (Ptr<RonPath> path, Time time)
 void
 RonPathHeuristic::DoNotifyAck (Ptr<RonPath> path, Time time)
 {
+  NS_ASSERT_MSG (path->GetN () > 1, "Got path of length " << path->GetN ()
+      << " in DoNotifyAck: heuristics only care about multi-peer paths!");
   EnsurePathRegistered (path);
   SetLikelihood (path, 1.0);
   //TODO: record partial path ACKs
@@ -316,6 +320,8 @@ void
 RonPathHeuristic::DoNotifyTimeout (Ptr<RonPath> path, Time time)
 {
   //TODO: handle partial path ACKs
+  NS_ASSERT_MSG (path->GetN () > 1, "Got path of length " << path->GetN ()
+      << " in DoNotifyTimeout: heuristics only care about multi-peer paths!");
   EnsurePathRegistered (path);
   SetLikelihood (path, 0.0);
 }

@@ -4,6 +4,7 @@
 #include "ns3/log.h"
 #include "ns3/uinteger.h"
 #include "ron-header.h"
+#include "ns3/assert.h"
 
 namespace ns3 {
 
@@ -238,12 +239,16 @@ RonHeader::SetPath (Ptr<RonPath> path)
   //loop up until we have one left
   for (; (itr != path->End ()) and (*itr != path->GetDestination ()); itr++)
     {
-      AddDest ((*(*itr)->Begin ())->address);
+      Ipv4Address addr = (*(*itr)->Begin ())->address;
+      AddDest (addr);
+      NS_ASSERT_MSG ((addr.Get () != 0), "setting path with IP address of 0.0.0.0!");
     }
-  SetDestination ((*(*itr)->Begin ())->address);
+  Ipv4Address addr = (*(*itr)->Begin ())->address;
+  NS_ASSERT_MSG ((addr.Get () != 0), "setting path with IP address of 0.0.0.0!");
+  SetDestination (addr);
 
   //ensure correct path size, which should include the Destination
-  NS_ASSERT (path->GetN () == m_ips.size () + 1);
+  NS_ASSERT_MSG (path->GetN () == m_ips.size () + 1, "path has incorrect size in SetPath!");
 }
 
 void

@@ -85,6 +85,8 @@ def parse_args(args):
                         help='''number of paths to send messages along when using overlay (default=%(default)s)''')
     parser.add_argument('--contact_attempts', default=1, type=int,
                         help='''number of times a node will attempt to try another path after a timeout while using the overlay (default=%(default)s)''')
+    parser.add_argument('--timeout', default=0.5, type=float,
+                        help='''number of seconds a node will wait before timing out a packet and (potentially) trying another path (default=%(default)s)''')
 
     # Control simulation repetition
     parser.add_argument('--runs', '-r', nargs='?',default=default_runs, type=int,
@@ -231,12 +233,12 @@ def makecmds(args):
             cmd += '--contact_attempts=%d ' % args.contact_attempts
             cmd += '--seed=%d ' % args.seed
             cmd += '--npaths=%s ' % npaths
+            cmd += "--timeout=%f " % args.timeout
 
             # static args
             if args.topology_type == 'rocketfuel':
                 cmd += "--latencies=rocketfuel/weights/all_latencies.intra "
                 cmd += "--locations=rocketfuel/city_locations.txt "
-            cmd += "--timeout=0.5 "
 
             ## $$$$ NO LONGER ASSUME SPACES " " AFTER COMMANDS!
 
