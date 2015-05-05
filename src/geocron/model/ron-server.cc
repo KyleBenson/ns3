@@ -149,10 +149,7 @@ RonServer::HandleRead (Ptr<Socket> socket)
                        InetSocketAddress::ConvertFrom (from).GetIpv4 () <<
                        " on behalf of " << head.GetFinalDest ());
 
-          // NOTE: make sure we use the destination from the RonHeader as otherwise
-          // we may not have seen this IP address before and we'll cause a crash
-          // when trying to extract the RonPath on the other side
-          socket->SendTo (packet, 0, head.GetFinalDest ());
+          socket->SendTo (packet, 0, InetSocketAddress (head.GetNextDest (), m_port));
         }
     }
 }
