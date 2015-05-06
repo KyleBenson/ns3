@@ -22,7 +22,8 @@
 
 #include <boost/range/functions.hpp>
 
-using namespace ns3;
+namespace ns3
+{
 
 NS_LOG_COMPONENT_DEFINE ("RonPeerTable");
 
@@ -71,6 +72,12 @@ bool
 RonPeerEntry::operator< (RonPeerEntry rhs) const
 {
   return id < rhs.id;
+}
+
+std::ostream&
+operator<< (std::ostream& os, RonPeerEntry const& peer)
+{
+  return os << peer.id;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -222,6 +229,13 @@ RonPeerTable::IsInTable (uint32_t id) const
 
 
 bool
+RonPeerTable::IsInTable (Ptr<RonPeerEntry> peer) const
+{
+  return IsInTable (peer->id);
+}
+
+
+bool
 RonPeerTable::IsInTable (Iterator itr) const
 {
   return IsInTable ((*itr)->id);
@@ -267,3 +281,5 @@ RonPeerTable::End () const
 {
   return boost::end (boost::adaptors::values (m_peers));
 }
+
+} // namespace ns3

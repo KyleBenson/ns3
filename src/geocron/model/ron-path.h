@@ -98,5 +98,8 @@ public:
   Iterator Begin ();
   Iterator End ();
 };
+
+std::ostream& operator<< (std::ostream& os, RonPath const& path);
+std::ostream& operator<< (std::ostream& os, PeerDestination const& dest);
 }
 #endif //RON_PATH_H

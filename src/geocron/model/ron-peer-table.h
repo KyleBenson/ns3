@@ -54,6 +54,7 @@ public:
   Vector location;
   Location region;
 };
+std::ostream& operator<< (std::ostream& os, RonPeerEntry const& peer);
 
 class RonPeerTable : public SimpleRefCount<RonPeerTable>
 {
@@ -93,6 +94,7 @@ class RonPeerTable : public SimpleRefCount<RonPeerTable>
   Ptr<RonPeerEntry> GetPeerByAddress (Ipv4Address address) const;
 
   bool IsInTable (uint32_t id) const;
+  bool IsInTable (Ptr<RonPeerEntry> peer) const;
   bool IsInTable (Iterator itr) const;
 
   /** Drop all RonPeerEntry entries from the table, updating all data structures in the table accordingly. */

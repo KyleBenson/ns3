@@ -18,7 +18,8 @@
 
 #include "ron-path.h"
 
-using namespace ns3;
+namespace ns3
+{
 
 RonPath::RonPath()
 {}
@@ -102,6 +103,23 @@ Ptr<PeerDestination>
 RonPath::GetDestination () const
 {
   return m_path.back ();
+}
+
+
+std::ostream&
+operator<< (std::ostream& os, RonPath const& path)
+{
+  bool first = true;
+  for (RonPath::ConstIterator itr = path.Begin ();
+      itr != path.End (); itr++)
+  {
+    if (first)
+      first = false;
+    else
+      os << "-->";
+    os << *(*itr);
+  }
+  return os;
 }
 
 
@@ -214,4 +232,23 @@ bool
 PeerDestination::operator!=(const PeerDestination rhs) const
 {
   return !(*this == rhs);
+}
+
+std::ostream&
+operator<< (std::ostream& os, PeerDestination const& dest)
+{
+  bool first = true;
+  for (PeerDestination::ConstIterator itr = dest.Begin ();
+      itr != dest.End (); itr++)
+  {
+    if (first)
+      first = false;
+    else
+      os << ", ";
+    os << (*(*itr));
+  }
+  return os;
+}
+
+// end of namespace ns3
 }
