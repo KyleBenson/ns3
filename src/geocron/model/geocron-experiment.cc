@@ -51,6 +51,11 @@ GeocronExperiment::GetTypeId ()
             IntegerValue (10),
             MakeIntegerAccessor (&GeocronExperiment::nServerChoices),
             MakeIntegerChecker<uint32_t> ())
+    .AddAttribute ("PeerTableSizeScalingFactor",
+            "When generating peer tables, each will be of size PeerTableSizeScalingFactor*log(n), where n is the number of peers",
+            IntegerValue (10),
+            MakeIntegerAccessor (&GeocronExperiment::peerTableSizeScalingFactor),
+            MakeIntegerChecker<uint32_t> ())
   ;
   return tid;
 }
@@ -688,7 +693,7 @@ GeocronExperiment::IndexNodes () {
       clientApps.Add (newApp);
       Ptr<RonClient> newClient = DynamicCast<RonClient> (newApp.Get (0));
       newClient->SetAttribute ("MaxPackets", UintegerValue (0)); //explicitly enable sensor reporting when disaster area set
-      newClient->SetPeerTable (GetPeerTableForPeer ((*node)->GetObject<RonPeerEntry> ()));
+      // NOTE: we will set the peer table later since we will randomly assign a new one for each run
     }
   
   clientApps.Start (Seconds (2.0));
@@ -880,7 +885,25 @@ GeocronExperiment::SetNextServers () {
 Ptr<RonPeerTable>
 GeocronExperiment::GetPeerTableForPeer (Ptr<RonPeerEntry> peer)
 {
-  return overlayPeers;
+  //TODO: cache this object?
+  static std::vector<Ptr<RonPeerEntry> > peerVector (overlayPeers->Begin (), overlayPeers->End ());
+  // randomly shuffle the peerVector and choose c*log(n) peers to add to a new RonPeerTable
+  std::random_shuffle (peerVector.begin (), peerVector.end ());
+  Ptr<RonPeerTable> newTable = Create<RonPeerTable> ();
+
+  uint32_t peersAdded = 0, maxPeers = peerTableSizeScalingFactor * std::log(overlayPeers->GetN ());
+  NS_LOG_LOGIC ("Generating table of " << maxPeers << " peers for peer " << peer->id);
+
+  for (; peersAdded < maxPeers; peersAdded++)
+  {
+    newTable->AddPeer (peerVector[peersAdded]);
+  }
+
+  // add one more if the random ones included the peer in question
+  // TODO: remove the other peer? doesn't seem to hurt anything for now...
+  if (newTable->IsInTable (peer))
+    newTable->AddPeer (peerVector[peersAdded]);
+  return newTable;
 }
 
 
@@ -917,7 +940,11 @@ GeocronExperiment::Run ()
 
         ronClient->SetHeuristic (heuristic);
         ronClient->SetServerPeerTable (serverPeers);
-        heuristic->SetPeerTable (overlayPeers);
+
+        // determine the peers this client, and likewise the heuristic, will know about
+        Ptr<RonPeerTable> table = GetPeerTableForPeer ((nodeItr->second)->GetObject<RonPeerEntry> ());
+        ronClient->SetPeerTable (table);
+        heuristic->SetPeerTable (table);
 
         // add the random heuristic
         //TODO: do this by TypeId and remove #include from beggining

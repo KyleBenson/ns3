@@ -143,6 +143,7 @@ private:
   std::map<Location, NodeContainer> serverNodeCandidates; //want to just find these once and randomly pick from later (1 entry per disaster location)
   /** Number of nodes to collect as potential server choices. */
   uint32_t nServerChoices;
+  uint32_t peerTableSizeScalingFactor;
 
   // Keep track of failed nodes/links to unfail them in between runs
   Ipv4InterfaceContainer ifacesToKill;
