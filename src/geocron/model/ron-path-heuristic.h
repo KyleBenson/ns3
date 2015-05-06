@@ -124,6 +124,9 @@ public:
       updates all of the other likelhood tables. */
   void AddPath (Ptr<RonPath> path);
 
+  /** Returns true if the paths for the given destination have been built. */
+  bool ArePathsBuilt (Ptr<PeerDestination> destination);
+
   /** Runs DoBuildPaths on all heuristics. */
   void BuildPaths (Ptr<PeerDestination> destination);
 
@@ -171,7 +174,6 @@ public:
   std::string m_summaryName;
   std::string m_shortName;
   double m_weight;
-  bool m_pathsBuilt;
 
   /** This  helps us aggregate the likelihoods together from each of the
       aggregate heuristics. */
@@ -237,6 +239,11 @@ public:
       return hashValue;
     }
   };
+
+  // Keep a set of which destinations we've automatically generated paths for
+  typedef boost::unordered_set<Ptr<PeerDestination>, PeerDestinationHasher> PathsBuilt;
+  typedef PathsBuilt::iterator PathsBuiltIterator;
+  PathsBuilt m_pathsBuilt;
 
   typedef boost::unordered_set<Ptr<RonPath>, PathHasher, PathTestEqual> PathsAttempted;
   typedef PathsAttempted::iterator PathsAttemptedIterator;

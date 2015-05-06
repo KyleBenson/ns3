@@ -25,6 +25,7 @@
 #include "ns3/address.h"
 #include "ns3/traced-callback.h"
 #include "ns3/output-stream-wrapper.h"
+#include "ns3/random-variable-stream.h"
 
 #include "ron-header.h"
 #include "ron-peer-table.h"
@@ -166,6 +167,8 @@ private:
   void HandleRead (Ptr<Socket> socket);
   void SetTimeout (Time t);
   void Send (bool viaOverlay);
+  /** Handles implementation of actually sending the packet to the given address. */
+  void DoSendTo (Ptr<Packet> p, Ipv4Address addr);
   void ScheduleTransmit (Time dt, bool viaOverlay = false);
   void CancelEvents (void);
   void SetDefaults (void);
@@ -186,6 +189,7 @@ private:
 
   Time m_timeout;
   //Address m_local;
+  Ptr<UniformRandomVariable> m_random; //for random decisions
 
   uint32_t m_sent;
   Ipv4Address m_address;

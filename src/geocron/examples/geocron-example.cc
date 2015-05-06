@@ -47,6 +47,7 @@ main (int argc, char *argv[])
   std::string locationFile = "";
   std::string disaster_location = "Los Angeles, CA";
   std::string npaths = "1";
+  std::string nservers = "1";
   bool tracing = false;
   double timeout = 1.0;
 
@@ -80,7 +81,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("contact_attempts", "Number of times a reporting node will attempt to contact the server "
                 "(it will use the overlay after the first attempt).  Default is 1 (no overlay).", exp->contactAttempts);
   cmd.AddValue ("npaths", "Number of diverse paths a node will use when sending data over the multipath overlay", npaths);
-  cmd.AddValue ("nservers", "Number of servers to activate that nodes will report to", exp->nServers);
+  cmd.AddValue ("nservers", "Number of servers to activate that nodes will report to", nservers);
 
   cmd.Parse (argc,argv);
 
@@ -103,6 +104,14 @@ main (int argc, char *argv[])
        tokIter != tokens.end(); ++tokIter)
     {
       npathsSelections->push_back (boost::lexical_cast<uint32_t> (*tokIter));
+    }
+
+  std::vector<uint32_t> * nserversSelections = new std::vector<uint32_t> ();
+  tokens = tokenizer(nservers, sep);
+  for (tokenizer::iterator tokIter = tokens.begin();
+       tokIter != tokens.end(); ++tokIter)
+    {
+      nserversSelections->push_back (boost::lexical_cast<uint32_t> (*tokIter));
     }
 
   std::vector<std::string> * disasterLocations = new std::vector<std::string> ();
@@ -172,11 +181,14 @@ main (int argc, char *argv[])
   //////////       Create experiment and set parameters   ////////////////////////
   ////////////////////////////////////////////////////////////////////////////////
 
+  // These parameters are all set directly on the GeocronExperiment object
+  // since it's a bit easier than creating a whole bunch of functions to do so
   exp->heuristics = heuristics;
   exp->disasterLocations = disasterLocations;
   exp->failureProbabilities = failureProbabilities;
   exp->SetTimeout (Seconds (timeout));
   exp->npaths = npathsSelections;
+  exp->nservers = nserversSelections;
 
   /*exp->ReadLatencyFile (latencyFile);
   exp->ReadLocationFile (locationFile);

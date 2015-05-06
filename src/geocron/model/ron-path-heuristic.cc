@@ -28,7 +28,6 @@ NS_OBJECT_ENSURE_REGISTERED (RonPathHeuristic);
 RonPathHeuristic::RonPathHeuristic ()
 {
   m_masterLikelihoods = NULL;
-  m_pathsBuilt = false;
   m_topLevel = NULL;
   m_peers = NULL;
 }
@@ -130,6 +129,13 @@ RonPathHeuristic::EnsurePathRegistered (Ptr<RonPath> path)
 }
 
 
+bool
+RonPathHeuristic::ArePathsBuilt (Ptr<PeerDestination> destination)
+{
+  return m_pathsBuilt.count (destination);
+}
+
+
 void
 RonPathHeuristic::BuildPaths (Ptr<PeerDestination> destination)
 {
@@ -143,7 +149,7 @@ RonPathHeuristic::BuildPaths (Ptr<PeerDestination> destination)
 void
 RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
 {
-  if (m_topLevel->m_pathsBuilt or m_pathsBuilt)
+  if (m_topLevel->ArePathsBuilt (destination) or ArePathsBuilt (destination))
     return;
 
   Ptr<RonPeerEntry> sourcePeer = GetSourcePeer ();
@@ -162,7 +168,7 @@ RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
       EnsurePathRegistered (path);
     }
   NS_LOG_LOGIC ("Created " << (*m_masterLikelihoods)[destination].size () << " paths");
-  m_pathsBuilt = true;
+  m_pathsBuilt.insert (destination);
   /*NS_ASSERT_MSG (m_likelihoods[destination].size () == m_peers->GetN () - 2,
     "we should have two less paths than peers now...");*/
 }

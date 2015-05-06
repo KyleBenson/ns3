@@ -81,6 +81,8 @@ def parse_args(args):
                         help='''failure probabilities to use (default=%(default)s)''')
     parser.add_argument('--heuristics', nargs='*', default=default_heuristics,
                         help='''which heuristics to run (1,2,...MAX) (default=%(default)s)''')
+    parser.add_argument('--nservers', default=['1'], nargs='+',
+                        help='''number of servers for each node to attempt contact with when reporting data (default=%(default)s)''')
     parser.add_argument('--npaths', default=['1'], nargs='+',
                         help='''number of paths to send messages along when using overlay (default=%(default)s)''')
     parser.add_argument('--contact_attempts', default=1, type=int,
@@ -161,6 +163,7 @@ def makecmds(args):
     fprobs = '"%s"' % '-'.join(args.fprobs)
     heuristics = '"%s"' % '-'.join(args.heuristics)
     npaths = '"%s"' % '-'.join(args.npaths)
+    nservers = '"%s"' % '-'.join(args.nservers)
 
     # determine # procs for each topology
     procs_per_topology = 1
@@ -234,6 +237,7 @@ def makecmds(args):
             cmd += '--seed=%d ' % args.seed
             cmd += '--npaths=%s ' % npaths
             cmd += "--timeout=%f " % args.timeout
+            cmd += '--nservers=%s ' % nservers
 
             # static args
             if args.topology_type == 'rocketfuel':

@@ -47,9 +47,7 @@ GeocronExperiment::GetTypeId ()
             MakePointerChecker<RandomVariableStream> ())
     .AddAttribute ("NumberServersChoices",
             "Number of servers to index based on their being external to disaster regions."
-            "This number should of course be bigger than --nservers,"
-            "but GeocronExperiment will increase this value to"
-            "accomodate a larger nservers value.",
+            "This number should of course be bigger than --nservers",
             IntegerValue (10),
             MakeIntegerAccessor (&GeocronExperiment::nServerChoices),
             MakeIntegerChecker<uint32_t> ())
@@ -68,15 +66,17 @@ GeocronExperiment::GeocronExperiment ()
   maxNDevs = 5;
   //cmd.AddValue ("install_stubs", "If not 0, install RON client only on stub nodes (have <= specified links - 1 (for loopback dev))", maxNDevs);
 
+  //these defaults should all be overwritten by the command line parser
   currLocation = "";
   currFprob = 0.0;
   currRun = 0;
-  currNpaths = 1;
+  currNPaths = 1;
+  currNServers = 1;
+
   contactAttempts = 10;
   traceFile = "";
   nruns = 1;
   seed = 0;
-  nServers = 1;
   start_run_number = 0;
 
   regionHelper = NULL;
@@ -474,16 +474,21 @@ GeocronExperiment::RunAllScenarios ()
               // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
               // to each other for each configuration of failures
               ApplyFailureModel ();
-              SetNextServers ();
-              for (uint32_t p = 0; p < npaths->size (); p++)
+              for (uint32_t s = 0; s < nservers->size (); s++)
               {
-                for (uint32_t h = 0; h < heuristics->size (); h++)
+                currNServers = nservers->at (s);
+                SetNextServers ();
+
+                for (uint32_t p = 0; p < npaths->size (); p++)
                 {
-                  currHeuristic = heuristics->at (h);
-                  currNpaths = npaths->at (p);
-                  SeedManager::SetRun(runSeed++);
-                  AutoSetTraceFile ();
-                  Run ();
+                  for (uint32_t h = 0; h < heuristics->size (); h++)
+                  {
+                    currHeuristic = heuristics->at (h);
+                    currNPaths = npaths->at (p);
+                    SeedManager::SetRun(runSeed++);
+                    AutoSetTraceFile ();
+                    Run ();
+                  }
                 }
               }
               UnapplyFailureModel ();
@@ -812,11 +817,11 @@ GeocronExperiment::SetNextServers () {
   serverNodes = NodeContainer ();
 
   // Choose the server nodes at random from those available.
-  // If none in this region, pick from the global list of nodes at random.
+  // If none outside this region, pick from the global list of nodes at random.
   bool useCandidates = serverNodeCandidates[currLocation].GetN () ? true : false;
 
   Ptr<Node> nextServerNode;
-  for (uint32_t i = 0; i < nServers; i++)
+  for (uint32_t i = 0; i < currNServers; i++)
   {
     if (useCandidates)
     {
@@ -922,7 +927,7 @@ GeocronExperiment::Run ()
         //heuristic->AddHeuristic (randHeuristic);
 
         ronClient->SetAttribute ("MaxPackets", UintegerValue (contactAttempts));
-        ronClient->SetAttribute ("MultipathFanout", UintegerValue (currNpaths));
+        ronClient->SetAttribute ("MultipathFanout", UintegerValue (currNPaths));
         numDisasterPeers++;
       }
     }

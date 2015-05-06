@@ -145,7 +145,7 @@ RonServer::HandleRead (Ptr<Socket> socket)
           packet->RemoveAllPacketTags ();
           packet->RemoveAllByteTags ();
 
-          NS_LOG_INFO ("ACKing " << (head.IsForward () ? "indirect" : "direct") << " packet from " <<
+          NS_LOG_INFO ("ACKing " << (head.IsForward () ? "indirect" : "direct") << " packet received from " <<
                        InetSocketAddress::ConvertFrom (from).GetIpv4 () <<
                        " on behalf of " << head.GetFinalDest ());
 

@@ -82,6 +82,7 @@ public:
   std::vector<Location> * disasterLocations;
   std::vector<double> * failureProbabilities;
   std::vector<uint32_t> * npaths;
+  std::vector<uint32_t> * nservers;
   //TODO: timeouts, max retries, etc.
 
   // These are public to allow a command line parser to set them
@@ -90,7 +91,6 @@ public:
   uint32_t nruns;
   uint32_t start_run_number;
   std::size_t seed; // for generating topology files
-  uint32_t nServers; // number of servers to activate that nodes will report to
 
   /** Builds various indices for choosing different node types of interest.
       Chooses links/nodes that may be failed during disaster simulation.
@@ -111,7 +111,8 @@ private:
   ObjectFactory* currHeuristic;
   Location currLocation;
   double currFprob;
-  uint32_t currNpaths; //current multipath fanout
+  uint32_t currNPaths; //current multipath fanout
+  uint32_t currNServers; //current number of servers to choose
   uint32_t currRun; //keep at 32 as it's used as a string later
   Time timeout;
   Time simulationLength;

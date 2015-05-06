@@ -74,6 +74,11 @@ RonClient::GetTypeId (void)
                    UintegerValue (1),
                    MakeUintegerAccessor (&RonClient::m_multipathFanout),
                    MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("Random",
+        "The random variable for random decisions, e.g. random backoff for sending multiple packets.",
+        StringValue ("ns3::UniformRandomVariable"),
+        MakePointerAccessor (&RonClient::m_random),
+        MakePointerChecker<RandomVariableStream> ())
     .AddTraceSource ("Send", "A new packet is created and is sent to the server or an overlay node",
                      MakeTraceSourceAccessor (&RonClient::m_sendTrace))
     .AddTraceSource ("Ack", "An ACK packet originating from the server is received",
@@ -456,13 +461,29 @@ RonClient::Send (bool viaOverlay)
       // call to the trace sinks before the packet is actually sent,
       // so that tags added to the packet can be sent as well
       m_sendTrace (p, GetNode ()->GetId ());
-      m_socket->SendTo (p, 0, InetSocketAddress(head->GetNextDest (), m_port));
-      ScheduleTimeout (head);
+
+      // we want a small backoff for non-first packets to prevent the
+      // infrastructure from dropping them
+      if (i > 0)
+        Simulator::Schedule (Seconds (m_random->GetValue (0.01, 1.5)),
+            &RonClient::DoSendTo, this, p, head->GetNextDest ());
+      else
+        DoSendTo (p, head->GetNextDest ());
+
+      ScheduleTimeout (head); //TODO: schedule should be in relation to the backoff, but we're only concerned with multipath messages at this point so timeouts don't matter
       NS_LOG_DEBUG ("Sent " << m_sent << "th packet out of " << m_count << " max to server at " << head->GetFinalDest ());
       m_sent++;
     }
   }
 }
+
+
+void
+RonClient::DoSendTo (Ptr<Packet> p, Ipv4Address addr)
+{
+  m_socket->SendTo (p, 0, InetSocketAddress(addr, m_port));
+}
+
 
 void 
 RonClient::HandleRead (Ptr<Socket> socket)
@@ -531,7 +552,7 @@ RonClient::ForwardPacket (Ptr<Packet> packet, Ipv4Address source)
       "forwarding packet destined for us!  What's wrong here?");
 
   m_forwardTrace (packet, GetNode ()-> GetId ());
-  m_socket->SendTo (packet, 0, InetSocketAddress(destination, m_port));
+  DoSendTo (packet, destination);
   //TODO: setup timeouts/ACKs for forwards
 }
 
