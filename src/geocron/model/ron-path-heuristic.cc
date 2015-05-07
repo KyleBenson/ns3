@@ -30,6 +30,7 @@ RonPathHeuristic::RonPathHeuristic ()
   m_masterLikelihoods = NULL;
   m_topLevel = NULL;
   m_peers = NULL;
+  m_source = NULL;
 }
 
 TypeId
@@ -42,10 +43,6 @@ RonPathHeuristic::GetTypeId (void)
                    DoubleValue (1.0),
                    MakeDoubleAccessor (&RonPathHeuristic::m_weight),
                    MakeDoubleChecker<double> ())
-    .AddAttribute ("UpdatedOnce", "True if heuristic has already made one pass to update the likelihoods and does not need to do so again.",
-                   BooleanValue (false),
-                   MakeBooleanAccessor (&RonPathHeuristic::m_updatedOnce),
-                   MakeBooleanChecker ())
     .AddAttribute ("Random",
             "The random variable for random decisions.",
             StringValue ("ns3::UniformRandomVariable"),
@@ -167,7 +164,8 @@ RonPathHeuristic::DoBuildPaths (Ptr<PeerDestination> destination)
       NS_ASSERT_MSG (path->GetN () > 1, "Built path of length " << path->GetN () << ", which is no good!");
       EnsurePathRegistered (path);
     }
-  NS_LOG_LOGIC ("Created " << (*m_masterLikelihoods)[destination].size () << " paths");
+  NS_LOG_LOGIC ("Created " << (*m_masterLikelihoods)[destination].size ()
+      << " paths to destination " << *destination);
   m_pathsBuilt.insert (destination);
   /*NS_ASSERT_MSG (m_likelihoods[destination].size () == m_peers->GetN () - 2,
     "we should have two less paths than peers now...");*/
@@ -178,6 +176,27 @@ double
 RonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
 {
   return 1.0;
+}
+
+
+bool
+RonPathHeuristic::IsLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination)
+{
+  return !m_updatedOnce.count (destination);
+}
+
+
+void
+RonPathHeuristic::NotifyLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination)
+{
+  m_updatedOnce.erase (destination);
+}
+
+
+void
+RonPathHeuristic::NotifyLikelihoodUpdated (const Ptr<PeerDestination> destination)
+{
+  m_updatedOnce.insert (destination);
 }
 
 
@@ -195,12 +214,12 @@ RonPathHeuristic::UpdateLikelihoods (const Ptr<PeerDestination> destination)
 void
 RonPathHeuristic::DoUpdateLikelihoods (const Ptr<PeerDestination> destination)
 {
-  if (!m_updatedOnce)
+  if (IsLikelihoodUpdateNeeded (destination))
     {
       for (PathLikelihoodInnerTable::iterator path = m_likelihoods.at (destination).begin ();
            path != m_likelihoods[destination].end (); path++)
         SetLikelihood (path->first, GetLikelihood (path->first));
-      m_updatedOnce = true;
+      NotifyLikelihoodUpdated (destination);
     }
 }
 
@@ -208,11 +227,17 @@ RonPathHeuristic::DoUpdateLikelihoods (const Ptr<PeerDestination> destination)
 void
 RonPathHeuristic::ForceUpdateLikelihoods (const Ptr<PeerDestination> destination)
 {
-  m_updatedOnce = false;
+  NotifyLikelihoodUpdateNeeded (destination);
   m_pathsAttempted.clear ();
   UpdateLikelihoods (destination);
 }
 
+bool
+RonPathHeuristic::ShouldConsiderPath (Ptr<RonPath> path)
+{
+  //TODO: write tests?
+  return !PathAttempted (path) and path->GetN () > 1;
+}
 
 Ptr<RonPath>
 RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
@@ -243,8 +268,7 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
   for (; probs != (*m_masterLikelihoods)[destination].end (); probs++)
     {
       double nextLh = probs->second->GetLh ();
-      // NOTE: we shouldn't return a path we've already attempted
-      if (nextLh > bestLikelihood and !PathAttempted (probs->first))
+      if (nextLh > bestLikelihood and ShouldConsiderPath (probs->first))
         {
           bestPath = probs->first;
           bestLikelihood = nextLh;
@@ -255,6 +279,8 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
     throw NoValidPeerException();
 
   PathAttempted (bestPath, true);
+  NS_ASSERT_MSG (bestPath->GetN () > 1, "Got path of length " << bestPath->GetN ()
+      << " in GetBestPath: heuristics should only care about multi-peer paths!");
   return (bestPath);
 }
 
@@ -296,8 +322,6 @@ RonPathHeuristic::NotifyAck (Ptr<RonPath> path, Time time)
 void
 RonPathHeuristic::DoNotifyAck (Ptr<RonPath> path, Time time)
 {
-  NS_ASSERT_MSG (path->GetN () > 1, "Got path of length " << path->GetN ()
-      << " in DoNotifyAck: heuristics only care about multi-peer paths!");
   EnsurePathRegistered (path);
   SetLikelihood (path, 1.0);
   //TODO: record partial path ACKs
@@ -326,8 +350,6 @@ void
 RonPathHeuristic::DoNotifyTimeout (Ptr<RonPath> path, Time time)
 {
   //TODO: handle partial path ACKs
-  NS_ASSERT_MSG (path->GetN () > 1, "Got path of length " << path->GetN ()
-      << " in DoNotifyTimeout: heuristics only care about multi-peer paths!");
   EnsurePathRegistered (path);
   SetLikelihood (path, 0.0);
 }

@@ -435,12 +435,16 @@ void
 TestRonPath::DoRun (void)
 {
   Ptr<PeerDestination> start = Create<PeerDestination> (peers[0]);
+  Ptr<PeerDestination> mid = Create<PeerDestination> (peers[1]);
   Ptr<PeerDestination> end = Create<PeerDestination> (peers.back ());
 
   ////////////////////////////// TEST PeerDestination  ////////////////////
 
   bool equality = *end == *end;
   NS_TEST_ASSERT_MSG_EQ (equality, true, "testing PeerDestination equality same obj");
+
+  equality = *start == *mid;
+  NS_TEST_ASSERT_MSG_EQ (equality, false, "testing PeerDestination equality false positive");
 
   equality = *start == *end;
   NS_TEST_ASSERT_MSG_EQ (equality, false, "testing PeerDestination equality false positive");

@@ -52,7 +52,7 @@ def ParseArgs():
 
     # Graph types to build
     parser.add_argument('--time', '-t', action='store_true',
-                        help='show graph of cumulative ACKs received over time')
+                        help='show graph of cumulative packets received over time by any of the servers')
 
     parser.add_argument('--congestion', '-c', action='store_true',
                         help='graph number of packets sent for each group')
@@ -182,7 +182,7 @@ class TraceNode:
     # TODO: implement getting more than one ACK????
 
     def __repr__(self):
-        return "Node " + self.id + ((" received first " + ("direct" if self.directAcks else "indirect") + " ACK at " + self.ackTime) if self.acks else "") + " sent %d and forwarded %d packets" % (self.sends, self.forwards)
+        return "Node " + self.id + ((" received first " + ("direct" if self.directAcks else "indirect") + " ACK at " + str(self.firstAckTime)) if self.acks else "") + " sent %d and forwarded %d packets" % (self.sends, self.forwards)
 
     def getTotalSends(self):
         return self.sends + self.forwards
@@ -200,22 +200,34 @@ class Parameters:
     '''
     The parameters used for a simulation run.
     '''
+    # NOTE: these indices ignore the actual filename as that gets sliced off!
+    FPROB_INDEX = -3
+    NSERVERS_INDEX = -2
+    HEURISTIC_INDEX = -1
+
     def __init__(self):
         self.fprob = 0.0
         self.heuristic = ''
+        self.nservers = 0
+        self.run = None
         #TODO: everything else
 
     @staticmethod
-    def parseFolderHierarchy(name):
+    def parseFolderHierarchy(name, extractRunNum=True):
+        '''
+        Extract the parameters from a folder or file name.
+        '''
         parts = name.split(os.path.sep)
+        params = Parameters()
 
         # cut off filename as its just the run #
-        if not os.path.isdir(parts[-1]):
+        if os.path.isfile(name):
+            params.run = parts[-1]
             parts = parts[:-1]
 
-        params = Parameters()
-        params.heuristic = parts[-1]
-        params.fprob = float(parts[-2])
+        params.heuristic = parts[Parameters.HEURISTIC_INDEX]
+        params.nservers = parts[Parameters.NSERVERS_INDEX]
+        params.fprob = float(parts[Parameters.FPROB_INDEX])
 
         return params
 
@@ -234,10 +246,11 @@ class TraceRun:
 
     TIME_RESOLUTION = 0.01 #In seconds
 
-    def __init__(self,filename):
+    def __init__(self,filename, normalize=True):
+        self.normalize = normalize
         self.nodes = {}
-        self.name = "Run" if not filename else os.path.split(filename)[1]
         self.nAcks = None
+        self.nRecvd = None
         self.nDirectAcks = None
         self.utility = None
         self.forwardTimes = {}
@@ -247,7 +260,8 @@ class TraceRun:
         self.nodesHeardFrom = {} # if a packet is received at the server
         self.nNodes = None
 
-        self.params = Parameters.parseFolderHierarchy(filename)
+        self.params = Parameters.parseFolderHierarchy(filename, True)
+        self.name = "Run" if not filename else self.getNameByParams(self.params)
 
         sigDigits = int(round(-math.log(TraceRun.TIME_RESOLUTION,10)))
 
@@ -317,6 +331,15 @@ class TraceRun:
                     node.sends += 1
                     self.sendTimes[time] = self.sendTimes.get(time,0) + 1
 
+    def getNameByParams(self, params):
+        name = "%s[f=%s,S=%s" % (params.heuristic,
+                                 params.fprob,
+                                 params.nservers)
+        if params.run is not None:
+            name += ",r=%s" % params.run
+        name += "]"
+        return name
+
     def getNNodes(self):
         '''Number of nodes that attempted contact with the server.'''
         if not self.nNodes:
@@ -328,6 +351,10 @@ class TraceRun:
         if not self.nAcks:
             self.nAcks = sum([1 for i in self.nodes.values() if i.acks])
         return self.nAcks
+
+    def getNRecvd(self):
+        '''Number of nodes that managed to get at least one packet to any one server.'''
+        return len(self.nodesHeardFrom)
 
     def getNSends(self):
         if not self.nSends:
@@ -348,6 +375,9 @@ class TraceRun:
         if isinstance(self.sendTimes, dict):
             items = sorted(self.sendTimes.items())
             self.sendTimes = ([i for i,j in items], [j for i,j in items])
+            if self.normalize:
+                self.sendTimes = normalizedTimes(self.getNNodes(), self.sendTimes)
+        #print "group", self.name, "sent", self.sendTimes[1][0], "packets at time ", self.sendTimes[0][0]
         return self.sendTimes
 
     #TODO: getUploadTimes ??
@@ -360,7 +390,9 @@ class TraceRun:
         if isinstance(self.ackTimes, dict):
             # sort everything by time first since its a dict
             items = sorted(self.ackTimes.items())
+            # TODO: normalize???
             self.ackTimes = ([i for i,j in items], [j for i,j in items])
+        #print "group", self.name, "recvd", self.ackTimes[1][0], "ACK packets at time ", self.ackTimes[0][0]
         return self.ackTimes
         #return (self.ackTimes.keys(), self.ackTimes.values())
 
@@ -373,6 +405,9 @@ class TraceRun:
             # sort everything by time first since its a dict
             items = sorted(self.recvTimes.items())
             self.recvTimes = ([i for i,j in items], [j for i,j in items])
+            if self.normalize:
+                self.recvTimes = normalizedTimes(self.getNNodes(), self.recvTimes)
+        #print "group", self.name, "recvd", self.recvTimes[1][0], "packets at time ", self.recvTimes[0][0]
         return self.recvTimes
 
     def getForwardTimes(self):
@@ -403,10 +438,17 @@ class TraceGroup:
     over these
     '''
 
-    def __init__(self,folder=None):
+    def __init__(self,folder=None, normalize=True):
+        self.normalize = normalize
+        if folder:
+            self.params = Parameters.parseFolderHierarchy(folder)
+            self.name = self.getNameByParams(self.params)
+        else:
+            self.name = "Group"
+
         self.traces = []
-        self.name = "Group" if not folder else [part.replace('_',' ') for part in reversed(folder.split(os.path.sep)) if part][0]
         self.nAcks = None
+        self.nRecvd = None
         self.nNodes = None
         self.nDirectAcks = None
         self.sendTimes = None
@@ -419,9 +461,15 @@ class TraceGroup:
         if folder:
             for f in os.listdir(folder):
                 if not f.startswith('.'):
-                    self.traces.append(TraceRun(os.path.join(folder,f)))
+                    self.traces.append(TraceRun(os.path.join(folder,f), self.normalize))
         elif folder is not None:
             print folder, "is not a directory!"
+
+    def getNameByParams(self, params):
+        name = "%s[f=%s,S=%s]" % (params.heuristic,
+                                  params.fprob,
+                                  params.nservers)
+        return name
 
     def __len__(self):
         return len(self.traces)
@@ -441,6 +489,14 @@ class TraceGroup:
         if not self.nAcks:
             self.nAcks = sum([t.getNAcks() for t in self.traces])/float(len(self.traces))
         return self.nAcks
+
+    def getNRecvd(self):
+        '''
+        Get average number of packets received by server(s) for all TraceRuns in this group.
+        '''
+        if not self.nRecvd:
+            self.nRecvd = sum([t.getNRecvd() for t in self.traces])/float(len(self.traces))
+        return self.nRecvd
 
     def getStdevNAcks(self):
         '''
@@ -493,7 +549,7 @@ class TraceGroup:
                     pointsLeft[irun] -= 1
                     nextIndex[irun] += 1
 
-        assert(sum(newCounts) == sum(sum(r[1]) for r in runs))
+        #assert(sum(newCounts) == sum(sum(r[1]) for r in runs))
 
         # Average the elements
         nRuns = float(nRuns)
@@ -614,7 +670,7 @@ if __name__ == '__main__':
 
     if args.summary:
         print "\n================================================= Summary =================================================\n"
-        headings = ('Group name\t\t', 'Active Nodes', '# ACKs\t', '# Direct ACKs', '% Improvement', 'Utility\t', 'Stdev')
+        headings = ('Group name\t\t', 'Active Nodes', '# Recvd\t', '# ACKs\t', '# Direct ACKs', '% Improvement', 'Utility\t', 'Stdev')
         print '%s\t'*len(headings) % headings, '\n'
 
         for g in traceGroups:
@@ -626,11 +682,11 @@ if __name__ == '__main__':
                 stdev = g.getStdevNAcks()
             except AttributeError:
                 stdev = 0.0
-            group_stats = (g.name, g.getNNodes(), nAcks, nDirectAcks, improvement, utility, stdev)
+            group_stats = (g.name, g.getNNodes(), g.getNRecvd(), nAcks, nDirectAcks, improvement, utility, stdev)
             if None in group_stats:
                 print "At least one of the stats for group %s is None, probably no nodes were alive!" % g.name
             else:
-                print "\t\t".join(["%-20s", '%.2f', '%.2f', '%.2f', '%.2f', '%.2f', '%.2f']) % group_stats
+                print "\t\t".join(["%-20s", '%.2f', '%.2f', '%.2f', '%.2f', '%.2f', '%.2f', '%.2f']) % group_stats
             print '\n==========================================================================================================='
 
     if args.t_test:
@@ -684,7 +740,10 @@ if __name__ == '__main__':
         '''Cumulative number of ACKs at each time step'''
         markers = 'x.*+do^s1_|'
         for i,g in enumerate(traceGroups):
-            plt.plot(*cumulative(normalizedTimes(g.getNNodes(), g.getRecvTimes())), label=g.name, marker=markers[i%len(markers)])
+            if g.getNNodes() == 0:
+                print "No nodes found in group # %d (%s). Skipping" % (i, g.name)
+                continue
+            plt.plot(*cumulative(g.getRecvTimes()), label=g.name, marker=markers[i%len(markers)])
 
         # If requested, plot the ACKs for the non-RON case, which is just a horizontal line of the number of direct ACKs
         if args.non_ron:
@@ -708,7 +767,7 @@ if __name__ == '__main__':
             plt.title(" ".join(((args.prepend_title[nextTitleIdx if len(args.prepend_title) > 1 else 0]
                                  if args.prepend_title else ''),
                                 (args.title[nextTitleIdx if len(args.title) > 1 else 0]
-                                 if args.title else "Cumulative ACKs over time"),
+                                 if args.title else "Cumulative packets received over time"),
                                 (args.append_title[nextTitleIdx if len(args.append_title) > 1 else 0]
                                  if args.append_title else ''))))
         except IndexError:
@@ -794,7 +853,7 @@ if __name__ == '__main__':
         '''Number of connections attempted at each time step'''
         markers = 'x.*+do^s1_|'
         for i,g in enumerate(traceGroups):
-            plt.plot(*normalizedTimes(g.getNNodes(), g.getSendTimes()), label=g.name, marker=markers[i%len(markers)])
+            plt.plot(*g.getSendTimes(), label=g.name, marker=markers[i%len(markers)])
         try:
             plt.title(" ".join(((args.prepend_title[nextTitleIdx if len(args.prepend_title) > 1 else 0]
                                  if args.prepend_title else ''),

@@ -34,6 +34,7 @@
 #include <list>
 #include <set>
 #include <vector>
+#include <map>
 
 namespace ns3 {
 
@@ -151,6 +152,10 @@ public:
    * \param peer Smart Pointer to peer to be added
    */
   void AddServerPeer (Ptr<RonPeerEntry> peer);
+  uint32_t GetNSentToDest (Ptr<RonPeerEntry> peer);
+  uint32_t GetNSentToDest (Ipv4Address addr);
+  uint32_t IncNSentToDest (Ptr<RonPeerEntry> peer);
+  uint32_t IncNSentToDest (Ipv4Address addr);
   void SetHeuristic (Ptr<RonPathHeuristic> heuristic);
 
   Ipv4Address GetAddress () const;
@@ -169,6 +174,8 @@ private:
   void Send (bool viaOverlay);
   /** Handles implementation of actually sending the packet to the given address. */
   void DoSendTo (Ptr<Packet> p, Ipv4Address addr);
+  void SendPacketTo (Ptr<Packet> p, Ipv4Address addr);
+  void ForwardPacketTo (Ptr<Packet> p, Ipv4Address addr);
   void ScheduleTransmit (Time dt, bool viaOverlay = false);
   void CancelEvents (void);
   void SetDefaults (void);
@@ -190,13 +197,13 @@ private:
   Time m_timeout;
   //Address m_local;
   Ptr<UniformRandomVariable> m_random; //for random decisions
-
-  uint32_t m_sent;
+  std::map<Ipv4Address, uint32_t> m_nsentToDest; // maps destination address -> nsent
   Ipv4Address m_address;
   Ptr<Socket> m_socket;
   uint16_t m_port;
   std::list<EventId> m_events;
-  std::set<uint32_t> m_outstandingSeqs;
+  typedef std::set<uint32_t> OutstandingSeqsContainer;
+  std::map<Ipv4Address, OutstandingSeqsContainer> m_outstandingSeqs;
   int m_nextPeer;
 
   Ptr<RonPeerTable> m_peers;

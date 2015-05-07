@@ -406,6 +406,9 @@ GeocronExperiment::SetTraceFile (std::string newTraceFile)
 void
 GeocronExperiment::AutoSetTraceFile ()
 {
+  // The trace files should look like:
+  // ron_output/topology/disaster_location/fprob/nservers/heuristic/run#.out
+
   boost::filesystem::path newTraceFile ("ron_output");
   newTraceFile /= boost::filesystem::path(topologyFile).stem ();
   newTraceFile /= boost::algorithm::replace_all_copy (currLocation, " ", "_");
@@ -416,6 +419,8 @@ GeocronExperiment::AutoSetTraceFile ()
   fprob << currFprob;
   newTraceFile /= fprob.str ();
   //newTraceFile /= boost::lexical_cast<std::string> (currFprob);
+
+  newTraceFile /= boost::lexical_cast<std::string> (currNServers);
 
   // extract unique filename from heuristic to summarize parameters, aggregations, etc.
   TypeId::AttributeInformation info;
@@ -822,15 +827,20 @@ GeocronExperiment::SetNextServers () {
   serverNodes = NodeContainer ();
 
   // Choose the server nodes at random from those available.
-  // If none outside this region, pick from the global list of nodes at random.
-  bool useCandidates = serverNodeCandidates[currLocation].GetN () ? true : false;
+  // To do this, we'll put all the candidates into a vector, shuffle them up,
+  // then pick up currNServers from them (or randomly from all the nodes if necessary).
+  // If we try to just continually pull server nodes at random, we end up with repeats,
+  // which results in the actual number of servers being less than it should have.
+  std::vector<Ptr<Node> > theseServerChoices (serverNodeCandidates[currLocation].Begin (),
+      serverNodeCandidates[currLocation].End ());
+  std::random_shuffle (theseServerChoices.begin (), theseServerChoices.end ());
 
   Ptr<Node> nextServerNode;
   for (uint32_t i = 0; i < currNServers; i++)
   {
-    if (useCandidates)
+    if (theseServerChoices.size () > i)
     {
-      nextServerNode = serverNodeCandidates[currLocation].Get (random->GetInteger (0, serverNodeCandidates[currLocation].GetN () - 1));
+      nextServerNode = theseServerChoices[i];
     }
     else
     {
@@ -870,6 +880,9 @@ GeocronExperiment::SetNextServers () {
   // save all the servers so we can tell the clients where they are
   serverPeers = Create<RonPeerTable> ();
   serverPeers->AddPeers (serverNodes);
+  NS_ASSERT_MSG (serverPeers->GetN () == currNServers,
+      "Should have built a table with " << currNServers
+      << " server peers but only have " << serverPeers->GetN ());
 
   allPeers->AddPeers (serverPeers);
 #ifdef NS3_LOG_ENABLE
@@ -937,6 +950,7 @@ GeocronExperiment::Run ()
         NS_ASSERT_MSG (heuristic, "Created heuristic is NULL! Bad heuristic name?");
         // Must set heuristic first so that source will be set and heuristic can make its heap
         heuristic->MakeTopLevel (); //must always do this! TODO: not need to?
+        heuristic->SetSourcePeer (nodeItr->second->GetObject<RonPeerEntry> ());
 
         ronClient->SetHeuristic (heuristic);
         ronClient->SetServerPeerTable (serverPeers);
@@ -972,6 +986,7 @@ GeocronExperiment::Run ()
   NS_LOG_UNCOND ("Starting simulation on map file " << topologyFile << ": " << std::endl
                  << nodes.GetN () << " total nodes" << std::endl
                  << overlayPeers->GetN () << " total overlay nodes" << std::endl
+                 << serverPeers->GetN () << " total servers" << std::endl
                  << disasterNodes[currLocation].size () << " nodes in " << currLocation << " total" << std::endl
                  << numDisasterPeers << " overlay nodes in " << currLocation << std::endl //TODO: get size from table
                  << std::endl << "Failure probability: " << currFprob << std::endl

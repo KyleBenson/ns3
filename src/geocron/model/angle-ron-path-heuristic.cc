@@ -173,5 +173,5 @@ AngleRonPathHeuristic::DoNotifyTimeout (Ptr<RonPath> path, Time time)
 {
   EnsurePathRegistered (path);
   SetLikelihood (path, 0.0);
-  m_updatedOnce = false; //so the LHs will be updated next time GetBestPath is called
+  NotifyLikelihoodUpdateNeeded (path->GetDestination ());
 }

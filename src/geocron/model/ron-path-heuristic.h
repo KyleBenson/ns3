@@ -56,6 +56,10 @@ public:
   RonPathHeuristic ();
   virtual ~RonPathHeuristic ();
 
+  /** Determine if this path should even be considered at all by the heuristic.
+   * Useful for separating logic of setting path scores and not repeating previously tried ones,
+   * paths of incorrect lengths, those in the current list of multipaths, etc. */
+  virtual bool ShouldConsiderPath (Ptr<RonPath> path);
   typedef std::vector<Ptr<RonPath> > RonPathContainer;
   /** Return the best path, according to the aggregate heuristics, to the destination. */
   Ptr<RonPath> GetBestPath (Ptr<PeerDestination> destination);
@@ -145,6 +149,13 @@ public:
       ensuring we don't get Null pointers when accessing Likelihoods. */
   void EnsurePathRegistered (Ptr<RonPath> path);
 
+  /** Checked every time UpdateLikelihoods is called.  They'll only proceed
+   * if this returns true.  Override to implement new logic for forcing updates,
+   * possibly making use of other virtual functions and setting local flags. */
+  virtual bool IsLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination);
+  void NotifyLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination);
+  void NotifyLikelihoodUpdated (const Ptr<PeerDestination> destination);
+
   /** Set the estimated likelihood of reaching the destination through each peer. 
       Assumes that we only need to assign random probs once, considered an off-line heuristic.
       Also assumes we should set LH to 0 if we failed to reach a peer.
@@ -165,9 +176,6 @@ public:
       attempted paths if true. */
   bool PathAttempted (Ptr<RonPath> path, bool recordPath=false);
 
-  /** May only need to assign likelihoods once.
-      Set this to true to avoid clearing LHs after each newly chosen peer. */
-  bool m_updatedOnce;
   Ptr<RonPeerTable> m_peers;
   Ptr<UniformRandomVariable> m_random; //for random decisions
   Ptr<RonPeerEntry> m_source;
@@ -206,6 +214,15 @@ public:
     }
   };
 
+  struct PeerDestinationTestEqual
+  {
+    inline bool operator() (const Ptr<PeerDestination> dest1,
+        const Ptr<PeerDestination> dest2) const
+    {
+      return *dest1 == *dest2;
+    }
+  };
+
   struct PeerDestinationHasher
   {
     inline size_t operator()(const Ptr<PeerDestination> hop) const
@@ -241,7 +258,7 @@ public:
   };
 
   // Keep a set of which destinations we've automatically generated paths for
-  typedef boost::unordered_set<Ptr<PeerDestination>, PeerDestinationHasher> PathsBuilt;
+  typedef boost::unordered_set<Ptr<PeerDestination>, PeerDestinationHasher, PeerDestinationTestEqual> PathsBuilt;
   typedef PathsBuilt::iterator PathsBuiltIterator;
   PathsBuilt m_pathsBuilt;
 
@@ -249,6 +266,11 @@ public:
   typedef PathsAttempted::iterator PathsAttemptedIterator;
   //typedef std::set<Ptr<RonPath>> PathsAttempted;
   PathsAttempted m_pathsAttempted;
+
+  typedef boost::unordered_set<Ptr<PeerDestination>, PeerDestinationHasher, PeerDestinationTestEqual> LikelihoodsUpdated;
+  /** May only need to assign likelihoods once.
+      Set this to true to avoid clearing LHs after each newly chosen peer. */
+  LikelihoodsUpdated m_updatedOnce;
 
   typedef Ptr<RonPath> PathLikelihoodInnerTableKey;
   typedef PathTestEqual PathLikelihoodInnerTableTestEqual;
