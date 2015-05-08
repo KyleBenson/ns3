@@ -72,6 +72,118 @@ InternetStackHelper GetInternetStack (void)
   return internet;
 }
 
+/////////////////////////////////////////////////////////////////////////
+/////////   topology generation helper classes    ///////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+class GeoOverlayGenerator
+{
+  /** This class creates a 6-node network as taken from the Rohrer2013 GeoDivRP paper */
+public:
+  Ipv4AddressHelper addressHelper;
+
+  PeerContainer peers;
+  NodeContainer nodes;
+
+  Ptr<RonPeerTable> peerTable;
+
+  static GeoOverlayGenerator * GetInstance ()
+  {
+    static GeoOverlayGenerator * instance = new GeoOverlayGenerator ();
+    return instance;
+  }
+
+  static NodeContainer GetNodes ()
+  {
+    return GetInstance ()->nodes;
+  }
+
+  static PeerContainer GetPeers ()
+  {
+    return GetInstance ()->peers;
+  }
+
+  static Ptr<Node> GetNode (uint32_t number)
+  {
+    return GetInstance ()->nodes.Get(number);
+  }
+
+  // really only exists for sanity checks in constructor
+  Ptr<RonPeerEntry> DoGetPeer (uint32_t number)
+  {
+    return peers[number];
+  }
+
+  static Ptr<RonPeerEntry> GetPeer (uint32_t number)
+  {
+    return GetInstance ()->DoGetPeer (number);
+  }
+
+  GeoOverlayGenerator ()
+  {
+    //first, build a topology for us to use
+    nodes.Create (6);
+
+    // we'll track the pairs of devices we create for ease of installing Ipv4Addresses later
+    std::vector<NetDeviceContainer> devicePairs;
+    PointToPointHelper pointToPoint;
+    pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
+
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[1]));
+    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[1]));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("3ms"));
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[3]));
+    devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[3]));
+    devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[5]));
+    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[5]));
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
+    devicePairs.push_back (pointToPoint.Install (nodes[3], nodes[4]));
+    devicePairs.push_back (pointToPoint.Install (nodes[4], nodes[5]));
+    //TODO: store the links as indexed by node numbers?
+    //std::map<uint32_t, std::map<uint32_t, Ptr<Channel> > links;
+
+    InternetStackHelper internet = GetInternetStack ();
+    internet.Install (nodes);
+
+    // make sure these addresses are different from those in any other network generators!
+    addressHelper = Ipv4AddressHelper ("11.1.0.0", "255.255.0.0");
+    for (std::vector<NetDeviceContainer>::iterator itr = devicePairs.begin ();
+        itr != devicePairs.end (); itr++)
+    {
+      addressHelper.Assign (*itr);
+      addressHelper.NewNetwork ();
+    }
+
+    // Create RonPeerEntries for each Node and save them
+    for (NodeContainer::Iterator itr = nodes.Begin (); itr != nodes.End (); itr++)
+    {
+      Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
+      peers.push_back (newPeer);
+    }
+
+    //TODO: set regions??
+    // Set the positions of the nodes using a list of positions in order of node #
+    //Ptr<MobilityModel> mobModel = CreateObject<ConstantPositionMobilityModel> ();
+    MobilityHelper mobHelper;
+    mobHelper.SetMobilityModel ("ConstantPositionMobilityModel");
+    Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator> ();
+    posAlloc->Add (Vector (0, 0, 0));
+    posAlloc->Add (Vector (100, 0, 0));
+    posAlloc->Add (Vector (200, 0, 0));
+    posAlloc->Add (Vector (50, 50, 0));
+    posAlloc->Add (Vector (100, 50, 0));
+    posAlloc->Add (Vector (150, 50, 0));
+    mobHelper.SetPositionAllocator (posAlloc);
+    mobHelper.Install (nodes);
+  }
+
+  ~GeoOverlayGenerator ()
+  {
+  }
+};
+
+
 class GridGenerator
 {
 public:
