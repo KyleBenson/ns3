@@ -56,6 +56,22 @@ bool ArePeersEqual (Ptr<RonPath> path1, Ptr<RonPath> path2)
   return equality;
 }
 
+InternetStackHelper GetInternetStack (void)
+{
+  // this routing configuration is taken straight from GeocronExperiment
+  Ipv4NixVectorHelper nixRouting;
+  nixRouting.SetAttribute("FollowDownEdges", BooleanValue (true));
+  Ipv4StaticRoutingHelper staticRouting;
+  Ipv4ListRoutingHelper routingList;
+  routingList.Add (staticRouting, 0);
+  routingList.Add (nixRouting, 10);
+
+  InternetStackHelper internet;
+  internet.SetRoutingHelper (routingList);
+
+  return internet;
+}
+
 class GridGenerator
 {
 public:
@@ -129,16 +145,8 @@ public:
     grid = new PointToPointGridHelper (nrows, ncols, pointToPoint);
     grid->BoundingBox (0, 0, nrows, ncols);
 
-    // this routing configuration is taken straight from GeocronExperiment
-    Ipv4NixVectorHelper nixRouting;
-    nixRouting.SetAttribute("FollowDownEdges", BooleanValue (true));
-    Ipv4StaticRoutingHelper staticRouting;
-    Ipv4ListRoutingHelper routingList;
-    routingList.Add (staticRouting, 0);
-    routingList.Add (nixRouting, 10);
+    InternetStackHelper internet = GetInternetStack ();
 
-    InternetStackHelper internet;
-    internet.SetRoutingHelper (routingList);
     grid->InstallStack (internet);
     grid->AssignIpv4Addresses (rowHelper, colHelper);
     rowHelper.NewNetwork ();
