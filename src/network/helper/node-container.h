@@ -224,6 +224,7 @@ public:
    * \returns the requested node pointer.
    */
   Ptr<Node> Get (uint32_t i) const;
+  Ptr<Node> operator[] (uint32_t i) const;
 
   /**
    * \brief Create n nodes and append pointers to them to the end of this 

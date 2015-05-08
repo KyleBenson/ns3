@@ -89,6 +89,11 @@ NodeContainer::Get (uint32_t i) const
 {
   return m_nodes[i];
 }
+Ptr<Node>
+NodeContainer::operator[] (uint32_t i) const
+{
+  return Get (i);
+}
 void 
 NodeContainer::Create (uint32_t n)
 {
