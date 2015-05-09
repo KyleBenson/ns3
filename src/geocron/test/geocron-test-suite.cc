@@ -155,18 +155,11 @@ public:
       addressHelper.NewNetwork ();
     }
 
-    // Create RonPeerEntries for each Node and save them
-    for (NodeContainer::Iterator itr = nodes.Begin (); itr != nodes.End (); itr++)
-    {
-      Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
-      peers.push_back (newPeer);
-    }
-
     //TODO: set regions??
     // Set the positions of the nodes using a list of positions in order of node #
     //Ptr<MobilityModel> mobModel = CreateObject<ConstantPositionMobilityModel> ();
     MobilityHelper mobHelper;
-    mobHelper.SetMobilityModel ("ConstantPositionMobilityModel");
+    mobHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
     Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator> ();
     posAlloc->Add (Vector (0, 0, 0));
     posAlloc->Add (Vector (100, 0, 0));
@@ -176,6 +169,13 @@ public:
     posAlloc->Add (Vector (150, 50, 0));
     mobHelper.SetPositionAllocator (posAlloc);
     mobHelper.Install (nodes);
+
+    // Create RonPeerEntries for each Node and save them
+    for (NodeContainer::Iterator itr = nodes.Begin (); itr != nodes.End (); itr++)
+    {
+      Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
+      peers.push_back (newPeer);
+    }
   }
 
   ~GeoOverlayGenerator ()
@@ -750,6 +750,162 @@ TestRonPath::DoRun (void)
 
   //TODO: check reversing with complex paths
   //TODO: catting paths together
+}
+
+////////////////////////////////////////////////////////////////////////////////
+class TestPhysicalPath : public TestCase
+{
+public:
+  TestPhysicalPath ();
+  virtual ~TestPhysicalPath ();
+  NodeContainer nodes;
+  PeerContainer peers;
+
+private:
+  virtual void DoRun (void);
+  void TestBasics ();
+  void TestLatency ();
+};
+
+
+TestPhysicalPath::TestPhysicalPath ()
+  : TestCase ("Test basic operations of PhysicalPath objects")
+{
+  nodes = GridGenerator::GetNodes ();
+  peers = GridGenerator::GetPeers ();
+}
+
+TestPhysicalPath::~TestPhysicalPath ()
+{
+}
+
+void
+TestPhysicalPath::DoRun (void)
+{
+  TestBasics ();
+  TestLatency ();
+}
+
+void
+TestPhysicalPath::TestBasics ()
+{
+  bool equality;
+  Ptr<RonPeerEntry> topLeftPeer = GridGenerator::GetPeer (0, 0),
+    topRightPeer = GridGenerator::GetPeer (4, 0),
+    botRightPeer = GridGenerator::GetPeer (4, 4),
+    topMidPeer = GridGenerator::GetPeer (2, 0);
+  // Plan: build a PhysicalPath from a RonPath (a bit easier than building a PhysicalPath manually),
+  Ptr<RonPath> ronPath = Create<RonPath> (Create<PeerDestination> (topRightPeer));
+  Ptr<PhysicalPath> path1 = Create<PhysicalPath> (topLeftPeer, ronPath),
+    path2 = NULL, path3 = NULL;
+
+  // assert that all the Nodes are the same
+  uint32_t i = 0;
+  for (NodeContainer::Iterator itr = path1->NodesBegin ();
+      itr != path1->NodesEnd (); itr++)
+  {
+    equality = (*itr)->GetId () == GridGenerator::GetNode (i++, 0)->GetId ();
+    NS_TEST_ASSERT_MSG_EQ (equality, true, "Got the wrong node from path1, created from a RonPath");
+  }
+  NS_TEST_ASSERT_MSG_EQ (i, 5, "path1 wasn't long enough! Only went through " << i << " nodes");
+
+  // Test equality.
+  equality = *path1 == *Create<PhysicalPath> (GridGenerator::GetPeer (0, 0), ronPath);
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "Creating the same path1 with same source RonPath failed equality test");
+
+  // Do this again with a shorter path.
+  ronPath = Create<RonPath> (topMidPeer);
+  path2 = Create<PhysicalPath> (topLeftPeer, ronPath);
+  i = 0;
+  for (NodeContainer::Iterator itr = path2->NodesBegin ();
+      itr != path2->NodesEnd (); itr++)
+  {
+    equality = (*itr)->GetId () == GridGenerator::GetNode (i++, 0)->GetId ();
+    NS_TEST_ASSERT_MSG_EQ (equality, true, "Got the wrong node from path2, created from a RonPath");
+  }
+  NS_TEST_ASSERT_MSG_EQ (i, 3, "path2 wasn't long enough! Only went through " << i << " nodes");
+
+  // Test intersection: full intersection, only one node, and none at all
+  NS_TEST_ASSERT_MSG_EQ (path1->GetIntersectionSize (path2), 5, "Intersection size incorrect!");
+  ronPath = Create<RonPath> (botRightPeer);
+  path3 = Create<PhysicalPath> (topRightPeer, ronPath);
+  NS_TEST_ASSERT_MSG_EQ (path3->GetIntersectionSize (path1), 1, "Intersection size incorrect!");
+  NS_TEST_ASSERT_MSG_EQ (path2->GetIntersectionSize (path3), 0, "Should not have any intersecting components!");
+
+  // Now we're going to make a copy of path2, physically add a Node/Link to it,
+  // and verify that it worked
+  path3 = path2;
+  path2 = Create<PhysicalPath> (topLeftPeer, Create<RonPath> (topMidPeer));
+  NS_TEST_ASSERT_MSG_EQ (*path3, *path2, "Paths should be equal!");
+
+  Ptr<Node> nodeToAdd = GridGenerator::GetNode (3, 0);
+  Ptr<NetDevice> deviceToAdd = NULL;
+  // iterate over all this Node's NetDevices until we find the one paired with the node at 2,0
+  for (i = 0; i < nodeToAdd->GetNDevices (); i++)
+  {
+    Ptr<NetDevice> dev = nodeToAdd->GetDevice (i);
+    if ((GetOtherNetDevice (dev)->GetNode ()) == topMidPeer->node)
+    {
+      deviceToAdd = GetOtherNetDevice (dev);
+      break;
+    }
+  }
+  equality = deviceToAdd == NULL;
+  NS_TEST_ASSERT_MSG_NE (equality, true, "Didn't find the device to add! Something is horribly wrong...");
+  Ptr<Ipv4> ipv4ToAdd = topMidPeer->node->GetObject<Ipv4> ();
+  i = ipv4ToAdd->GetInterfaceForDevice (deviceToAdd);
+  Link linkToAdd (ipv4ToAdd, i);
+  path2->AddHop (nodeToAdd, linkToAdd);
+  NS_TEST_ASSERT_MSG_NE (*path3, *path2, "Paths are equal after adding a hop to one of them!");
+  NS_TEST_ASSERT_MSG_EQ (path3->GetIntersectionSize (path2), 5, "Incorrect intersection size!");
+  NS_TEST_ASSERT_MSG_EQ (path2->GetIntersectionSize (path1), 7, "Incorrect intersection size!");
+
+  // Test positive equality by building this path using a RonPath this time
+  path3 = Create<PhysicalPath> (topLeftPeer, Create<RonPath> (GridGenerator::GetPeer (3, 0)));
+  NS_TEST_ASSERT_MSG_EQ (*path3, *path2, "Paths should be equal when one is created directly and other had hop added!");
+
+  // Test multi-destination path! go around edges again to keep simple
+  path2 = Create<PhysicalPath> (topRightPeer, Create<RonPath> (botRightPeer));
+  ronPath = Create<RonPath> (topRightPeer);
+  ronPath->AddHop (botRightPeer);
+  path3 = Create<PhysicalPath> (topLeftPeer, ronPath);
+  NS_TEST_ASSERT_MSG_EQ (path3->GetNNodes (), 9, "Incorrect number of nodes in multi-dest path!");
+  NS_TEST_ASSERT_MSG_EQ (path3->GetNLinks (), 8, "Incorrect number of Links in multi-dest path!");
+  NS_TEST_ASSERT_MSG_EQ (path1->GetIntersectionSize (path3), 9, "Incorrect intersection size with multi-dest path!");
+  NS_TEST_ASSERT_MSG_EQ (path3->GetIntersectionSize (path2), 9, "Incorrect intersection size with multi-dest path!");
+  NS_TEST_ASSERT_MSG_NE (*path3, *path2, "Paths shouldn't be equal!");
+  NS_TEST_ASSERT_MSG_NE (*path3, *path1, "Paths shouldn't be equal!");
+
+  // Check that all the expected nodes are present
+  i = 0;
+  NodeContainer::Iterator itr = path3->NodesBegin ();
+  for (; itr != path3->NodesEnd () and i < 5; itr++)
+  {
+    equality = (*itr)->GetId () == GridGenerator::GetNode (i++, 0)->GetId ();
+    NS_TEST_ASSERT_MSG_EQ (equality, true, "Got the wrong node from multi-dest path, created from a RonPath");
+  }
+  NS_TEST_ASSERT_MSG_EQ (i, 5, "path2 wasn't long enough! Only went through " << i << " nodes");
+  // we only expect 4 more nodes on this leg
+  i = 1;
+  for (; itr != path3->NodesEnd () and i < 4; itr++)
+  {
+    equality = (*itr)->GetId () == GridGenerator::GetNode (4, i++)->GetId ();
+    NS_TEST_ASSERT_MSG_EQ (equality, true, "Got the wrong node from multi-dest path, created from a RonPath");
+  }
+  NS_TEST_ASSERT_MSG_EQ (i, 4, "path2 wasn't long enough! Only went through " << i << " nodes");
+}
+
+void
+TestPhysicalPath::TestLatency ()
+{
+  Ptr<RonPath> ronPath = Create<RonPath> (GeoOverlayGenerator::GetPeer (3));
+  ronPath->AddHop (GeoOverlayGenerator::GetPeer (4));
+  ronPath->AddHop (GeoOverlayGenerator::GetPeer (5));
+  Ptr<PhysicalPath> path01 = Create<PhysicalPath> (GeoOverlayGenerator::GetPeer (0), Create<RonPath> (GeoOverlayGenerator::GetPeer (1))),
+    path0345 = Create<PhysicalPath> (GeoOverlayGenerator::GetPeer (0), ronPath);
+
+  NS_TEST_ASSERT_MSG_EQ (path01->GetLatency (), Time ("5ms"), "Latency not as expected!");
+  NS_TEST_ASSERT_MSG_EQ (path0345->GetLatency (), Time ("7ms"), "Latency not as expected!");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1999,6 +2155,7 @@ GeocronTestSuite::GeocronTestSuite ()
   AddTestCase (new TestPeerEntry, TestCase::QUICK);
   AddTestCase (new TestPeerTable, TestCase::QUICK);
   AddTestCase (new TestRonPath, TestCase::QUICK);
+  AddTestCase (new TestPhysicalPath, TestCase::QUICK);
 
   //heuristics
   AddTestCase (new TestRonPathHeuristic, TestCase::QUICK);
