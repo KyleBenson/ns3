@@ -30,6 +30,7 @@ public:
   static TypeId GetTypeId (void);
 //private:
   virtual double GetLikelihood (Ptr<RonPath> path);
+  //bool IsLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination);
 };
 } //namespace
 #endif //IDEAL_RON_PATH_HEURISTIC_H

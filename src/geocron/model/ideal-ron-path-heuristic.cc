@@ -98,3 +98,10 @@ IdealRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
   return 1.0;
 }
 
+
+//bool
+//IdealRonPathHeuristic::IsLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination)
+//{
+  //return false; // this should never need to happen until we get to dynamic failures
+//}
+

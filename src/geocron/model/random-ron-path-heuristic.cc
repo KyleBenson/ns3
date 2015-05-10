@@ -51,6 +51,13 @@ RandomRonPathHeuristic::GetTypeId (void)
 }
 
 
+//bool
+//RandomRonPathHeuristic::IsLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination)
+//{
+  //return false; //cuz why would it be?
+//}
+
+
 double
 RandomRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
 {
