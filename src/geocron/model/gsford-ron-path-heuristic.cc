@@ -23,6 +23,7 @@
 using namespace ns3;
 
 NS_OBJECT_ENSURE_REGISTERED (GsfordRonPathHeuristic);
+NS_LOG_COMPONENT_DEFINE ("GsfordRonPathHeuristic");
 
 GsfordRonPathHeuristic::GsfordRonPathHeuristic ()
 {
@@ -119,9 +120,9 @@ GsfordRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
             penalty++;
         }
       }
-      NS_LOG_UNCOND ("Penalty after checking path " << *otherPhysPath << " is " << penalty);
+      NS_LOG_DEBUG ("Penalty after checking path " << *otherPhysPath << " is " << penalty);
     }
-    NS_LOG_UNCOND ("Penalty for path " << *thisPhysPath << " (peer " << *(*(*path->Begin ())->Begin ()) << ") is " << penalty);
+    NS_LOG_DEBUG ("Penalty for path " << *thisPhysPath << " (peer " << *(*(*path->Begin ())->Begin ()) << ") is " << penalty);
     // We need to ensure penalty is at least 1 to avoid division by 0 if this path is fully disjoint
     NS_ASSERT_MSG (penalty >= 0, "penalty should be at least 0 since we accounted for shared physical path with both source and destination");
     // We use the latency as a tie-breaker, so we need to normalize the
@@ -141,7 +142,7 @@ GsfordRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
     double lhLatencyComponent = deltaLh / (latency + 1);
     double finalLh = lh + lhLatencyComponent;
     NS_ASSERT_MSG (lhLatencyComponent >= 0 and lhLatencyComponent < deltaLh, "Likelihood latency component not in expected range!");
-    //NS_LOG_UNCOND ("LH for peer " << *(*(*path->Begin ())->Begin ()) << " is " << finalLh);
+    NS_LOG_DEBUG ("LH for peer " << *(*(*path->Begin ())->Begin ()) << " is " << finalLh);
     return finalLh;
   }
 }
