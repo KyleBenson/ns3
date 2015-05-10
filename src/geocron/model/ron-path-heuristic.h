@@ -60,11 +60,17 @@ public:
    * Useful for separating logic of setting path scores and not repeating previously tried ones,
    * paths of incorrect lengths, those in the current list of multipaths, etc. */
   virtual bool ShouldConsiderPath (Ptr<RonPath> path);
-  typedef std::vector<Ptr<RonPath> > RonPathContainer;
   /** Return the best path, according to the aggregate heuristics, to the destination. */
   Ptr<RonPath> GetBestPath (Ptr<PeerDestination> destination);
-  /** Return the best multi-path, according to the aggregate heuristics, to the destination. */
-  RonPathContainer GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout);
+  /** Return the best multi-path, according to the aggregate heuristics, to the destination.
+   * The optional currentMultiPath argument tells the function that part of the multipath
+   * is already built and it should add the remaining fanout to this path,
+   * considering the components along it when setting likelihoods. */
+  virtual RonPathContainer GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout,
+      RonPathContainer currentMultiPath = RonPathContainer ());
+  /** We want to let heuristics know what the currently selected
+   * RonPaths are so that they can make decisions based on those. */
+  const RonPathContainer& GetCurrentMultipath () const;
 
   /** Return the best multicast path, according to the aggregate heuristics, to the destinations. */
   //TODO: Ptr<RonPath> GetBestMulticastPath (itr<Ptr<RonPeerEntry???> destinations);
@@ -123,6 +129,12 @@ public:
       The MOST IMPORTANT method to override/implement.
    */
   virtual double GetLikelihood (Ptr<RonPath> path);
+  /** The same as GetLikelihood but allows the heuristic to consider the currently
+   * chosen multipath when getting the likelihood of the specified path.
+   * The default implementation simply ignores currentMultiPath and calls
+   * GetLikelihood (path);
+   * NOTE: not currently implemented!! */
+  virtual double GetLikelihood (Ptr<RonPath> path, RonPathContainer & currentMultiPath);
 
   /** Adds the given path to the master likelihood table of the top-level heuristic,
       updates all of the other likelhood tables. */
@@ -182,6 +194,7 @@ public:
   std::string m_summaryName;
   std::string m_shortName;
   double m_weight;
+  RonPathContainer m_currentMultiPath;
 
   /** This  helps us aggregate the likelihoods together from each of the
       aggregate heuristics. */

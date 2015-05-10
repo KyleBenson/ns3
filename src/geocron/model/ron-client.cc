@@ -418,7 +418,7 @@ RonClient::Send (bool viaOverlay)
     bool shouldSendDirect = GetNSentToDest (serverPeer) == 0;
 
     // Here we'll gather all the overlay peers we will use in multipath messaging
-    RonPathHeuristic::RonPathContainer overlayPeerChoices;
+    RonPathContainer overlayPeerChoices;
 
     // If forwarding thru overlay, use heuristic to pick a peer from those available
     if (viaOverlay)

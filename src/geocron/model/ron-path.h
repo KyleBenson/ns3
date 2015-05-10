@@ -99,6 +99,7 @@ public:
   Iterator End ();
 };
 
+typedef std::vector<Ptr<RonPath> > RonPathContainer;
 std::ostream& operator<< (std::ostream& os, RonPath const& path);
 std::ostream& operator<< (std::ostream& os, PeerDestination const& dest);
 }

@@ -92,7 +92,9 @@ RonPathHeuristic::AddPath (Ptr<RonPath> path)
   // then add the reference to this value to our table.
   else
     {
+      // Check if a LH for this path exists already
       Ptr<Likelihood> lh = (*m_masterLikelihoods)[dest][path], newLh;
+      // Add the path if it doesn't
       if (lh == NULL)
         {
           //this should only happen if we are top-level
@@ -179,6 +181,13 @@ RonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
 }
 
 
+double
+RonPathHeuristic::GetLikelihood (Ptr<RonPath> path, RonPathContainer & currentMultiPath)
+{
+  return GetLikelihood (path);
+}
+
+
 bool
 RonPathHeuristic::IsLikelihoodUpdateNeeded (const Ptr<PeerDestination> destination)
 {
@@ -229,6 +238,7 @@ RonPathHeuristic::ForceUpdateLikelihoods (const Ptr<PeerDestination> destination
 {
   NotifyLikelihoodUpdateNeeded (destination);
   m_pathsAttempted.clear ();
+  m_currentMultiPath.clear ();
   UpdateLikelihoods (destination);
 }
 
@@ -236,6 +246,7 @@ bool
 RonPathHeuristic::ShouldConsiderPath (Ptr<RonPath> path)
 {
   //TODO: write tests?
+  // We want to avoid getting the path going straight to the destination
   return !PathAttempted (path) and path->GetN () > 1;
 }
 
@@ -285,10 +296,19 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 }
 
 
-RonPathHeuristic::RonPathContainer
-RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout)
+RonPathContainer
+RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t multipathFanout,
+    RonPathContainer currentMultiPath)
 {
   NS_ASSERT_MSG (multipathFanout > 0, "multipathFanout <= 0, this won't return any peer choices!");
+
+  // We want to let heuristics know what the currently selected RonPaths
+  // are so that they can make decisions based on those.  Clear the
+  // previous multipath and add the RonPath going straight to the
+  // destination so we can try and avoid anything too similar.
+  m_currentMultiPath = currentMultiPath;
+  m_currentMultiPath.push_back (Create<RonPath> (destination));
+  NotifyLikelihoodUpdateNeeded (destination); //don't use force or we will clear m_currentMultiPath
 
   RonPathContainer result;
   for (; multipathFanout > 0; multipathFanout--)
@@ -297,8 +317,27 @@ RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t m
     Ptr<RonPath> nextDest = GetBestPath (destination);
     NS_ASSERT_MSG (nextDest->GetN () > 1, "Got path of length " << nextDest->GetN () << " in GetBestMultiPath, which is no good!");
     result.push_back (nextDest);
+    m_currentMultiPath.push_back (nextDest);
+    NotifyLikelihoodUpdateNeeded (destination); //don't use force or we may get duplicates
   }
+
+  uint32_t nitrs = 0;
+  for (RonPathContainer::iterator itr = result.begin(); itr != result.end(); itr++)
+  {
+    NS_ASSERT_MSG ((*itr)->GetN () > 1, "Got path of length " << (*itr)->GetN () << " in GetBestMultiPath, which is no good!");
+    nitrs++;
+  }
+  NS_ASSERT_MSG (nitrs == result.size(), "not enough path iterations!");
   return result;
+  //TODO: perhaps ForceUpdateLikelihoods (destination) in order to
+  //clear the attempted paths?
+}
+
+
+const RonPathContainer&
+RonPathHeuristic::GetCurrentMultipath () const
+{
+  return m_currentMultiPath;
 }
 
 
