@@ -45,6 +45,8 @@ private:
 public:
   PhysicalPath();
   PhysicalPath(Ptr<RonPeerEntry> source, Ptr<RonPath> other);
+  PhysicalPath(Ptr<RonPeerEntry> source, Ptr<PeerDestination> other);
+  PhysicalPath(Ptr<RonPeerEntry> source, Ptr<RonPeerEntry> other);
 
   /** Adds a node and link to the path. */
   void AddHop (Ptr<Node> node, Link link);

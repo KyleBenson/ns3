@@ -33,6 +33,18 @@ PhysicalPath::PhysicalPath(Ptr<RonPeerEntry> source, Ptr<RonPath> other)
 }
 
 
+PhysicalPath::PhysicalPath(Ptr<RonPeerEntry> source, Ptr<PeerDestination> other)
+{
+  SetPathFromRonPath (source, Create<RonPath> (other));
+}
+
+
+PhysicalPath::PhysicalPath(Ptr<RonPeerEntry> source, Ptr<RonPeerEntry> other)
+{
+  SetPathFromRonPath (source, Create<RonPath> (other));
+}
+
+
 void
 PhysicalPath::AddHop (Ptr<Node> node, Link link)
 {
