@@ -122,24 +122,42 @@ public:
   GeoOverlayGenerator ()
   {
     //first, build a topology for us to use
-    nodes.Create (6);
+    nodes.Create (12);
 
     // we'll track the pairs of devices we create for ease of installing Ipv4Addresses later
     std::vector<NetDeviceContainer> devicePairs;
     PointToPointHelper pointToPoint;
     pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
 
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("7ms"));
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[9]));
+    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[9]));
+    devicePairs.push_back (pointToPoint.Install (nodes[8], nodes[10]));
+
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("6ms"));
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[7]));
+    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[7]));
+    devicePairs.push_back (pointToPoint.Install (nodes[5], nodes[6]));
+
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
     devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[1]));
     devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[1]));
+    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[10]));
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[11]));
+
+    pointToPoint.SetChannelAttribute ("Delay", StringValue ("4ms"));
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[3])); //so that 1 is chosen as lowest latency peer
+
     pointToPoint.SetChannelAttribute ("Delay", StringValue ("3ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[3]));
     devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[3]));
-    devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[5]));
+    //devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[5]));
     devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[5]));
+    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[8]));
+
     pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
     devicePairs.push_back (pointToPoint.Install (nodes[3], nodes[4]));
     devicePairs.push_back (pointToPoint.Install (nodes[4], nodes[5]));
+    devicePairs.push_back (pointToPoint.Install (nodes[11], nodes[6]));
     //TODO: store the links as indexed by node numbers?
     //std::map<uint32_t, std::map<uint32_t, Ptr<Channel> > links;
 
@@ -161,20 +179,27 @@ public:
     MobilityHelper mobHelper;
     mobHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
     Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator> ();
-    posAlloc->Add (Vector (0, 0, 0));
-    posAlloc->Add (Vector (100, 0, 0));
-    posAlloc->Add (Vector (200, 0, 0));
-    posAlloc->Add (Vector (50, 50, 0));
+    posAlloc->Add (Vector (0, 50, 0));
     posAlloc->Add (Vector (100, 50, 0));
-    posAlloc->Add (Vector (150, 50, 0));
+    posAlloc->Add (Vector (200, 50, 0));
+    posAlloc->Add (Vector (50, 100, 0));
+    posAlloc->Add (Vector (100, 100, 0)); //4
+    posAlloc->Add (Vector (150, 100, 0));
+    posAlloc->Add (Vector (50, 150, 0));
+    posAlloc->Add (Vector (100, 25, 0));
+    posAlloc->Add (Vector (0, 25, 0));  //8
+    posAlloc->Add (Vector (100, 75, 0));
+    posAlloc->Add (Vector (250, 0, 0));
+    posAlloc->Add (Vector (0, 150, 0));
     mobHelper.SetPositionAllocator (posAlloc);
     mobHelper.Install (nodes);
 
     // Create RonPeerEntries for each Node and save them
     for (NodeContainer::Iterator itr = nodes.Begin (); itr != nodes.End (); itr++)
     {
-      Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
+      Ptr<RonPeerEntry> newPeer = CreateObject<RonPeerEntry> (*itr);
       peers.push_back (newPeer);
+      (*itr)->AggregateObject (newPeer); //some heuristics rely on this!
     }
   }
 
@@ -277,11 +302,12 @@ public:
 
     for (NodeContainer::Iterator itr = cachedNodes.Begin (); itr != cachedNodes.End (); itr++)
     {
-      Ptr<RonPeerEntry> newPeer = Create<RonPeerEntry> (*itr);
+      Ptr<RonPeerEntry> newPeer = CreateObject<RonPeerEntry> (*itr);
 
       //newPeer->id = id++;
       cachedPeers.push_back (newPeer);
-      }
+      (*itr)->AggregateObject (newPeer); //some heuristics rely on this!
+    }
 
     //set regions for testing those types of heuristics
     cachedPeers[0]->region = "TL";
@@ -905,7 +931,7 @@ TestPhysicalPath::TestLatency ()
     path0345 = Create<PhysicalPath> (GeoOverlayGenerator::GetPeer (0), ronPath);
 
   NS_TEST_ASSERT_MSG_EQ (path01->GetLatency (), Time ("5ms"), "Latency not as expected!");
-  NS_TEST_ASSERT_MSG_EQ (path0345->GetLatency (), Time ("7ms"), "Latency not as expected!");
+  NS_TEST_ASSERT_MSG_EQ (path0345->GetLatency (), Time ("8ms"), "Latency not as expected!");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1051,13 +1077,13 @@ TestRonPathHeuristic::DoRun (void)
 
   // reset heuristic's likelihoods first
   h0->ForceUpdateLikelihoods (dest);
-  RonPathHeuristic::RonPathContainer paths = h0->GetBestMultiPath (dest, 2);
+  RonPathContainer paths = h0->GetBestMultiPath (dest, 2);
   NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "should have gotten 2 paths for multipath!");
   equality = *paths[0] == *paths[1];
   NS_TEST_ASSERT_MSG_NE (equality, true, "the two paths from GetBestMultiPath should not be the same!");
 
   // verify that getting another round of paths doesn't return duplicate either
-  RonPathHeuristic::RonPathContainer nextPaths = h0->GetBestMultiPath (dest, 1);
+  RonPathContainer nextPaths = h0->GetBestMultiPath (dest, 1);
   equality = *paths[0] == *nextPaths[0];
   NS_TEST_ASSERT_MSG_NE (equality, true, "second round of paths from GetBestMultiPath should have the same peers!");
   equality = *paths[1] == *nextPaths[0];
@@ -1606,6 +1632,115 @@ TestAngleRonPathHeuristic::DoRun (void)
 
 ////////////////////////////////////////////////////////////////////////////////
 
+class TestGsfordRonPathHeuristic : public TestCase
+{
+public:
+  TestGsfordRonPathHeuristic ();
+  virtual ~TestGsfordRonPathHeuristic ();
+  NodeContainer nodes;
+  Ptr<RonPeerTable> peers;
+  PeerContainer peerVector;
+  Ptr<PeerDestination> server;
+  Ptr<RonPeerEntry> source;
+
+private:
+  virtual void DoRun (void);
+};
+
+
+
+TestGsfordRonPathHeuristic::TestGsfordRonPathHeuristic ()
+  : TestCase ("Test GsfordRonPathHeuristic")
+{
+  nodes = GeoOverlayGenerator::GetNodes ();
+  peerVector = GeoOverlayGenerator::GetPeers ();
+  peers = Create<RonPeerTable> ();
+  peers->AddPeer (peerVector[1]);
+  peers->AddPeer (peerVector[4]);
+  peers->AddPeer (peerVector[6]);
+  peers->AddPeer (peerVector[7]);
+  peers->AddPeer (peerVector[9]);
+
+  server = Create<PeerDestination> (peerVector[10]);
+
+  source = peerVector[0];
+}
+
+TestGsfordRonPathHeuristic::~TestGsfordRonPathHeuristic ()
+{
+}
+
+void
+TestGsfordRonPathHeuristic::DoRun (void)
+{
+  Ptr<GsfordRonPathHeuristic> heuristic = CreateObject<GsfordRonPathHeuristic> ();
+  heuristic->SetAttribute ("D", DoubleValue (50.0));
+  heuristic->SetPeerTable (peers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  RonPathContainer paths;
+  RonPathContainer::iterator pathItr;
+  bool equality;
+
+  paths = heuristic->GetBestMultiPath (server, 5);
+  pathItr = paths.begin ();
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 5, "Not enough paths");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[6], "Got wrong second peer!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[4], "Got wrong fifth peer!");
+
+  // TODO: figure out what the bug was that resulted in the last path iterator being corrupted!
+  // Strangely, it seems to only appear when the peer comparison evaluates to false?  But I've also
+  // seen it appear just from dereferencing an iterator so something stranger must be up....
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[6], "Got wrong second peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[4], "Got wrong fifth peer!");
+  equality = pathItr == paths.end ();
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
+
+  // Now we change the threshold value and verify a different set of paths
+  heuristic->SetAttribute ("D", DoubleValue (25.0));
+  heuristic->ForceUpdateLikelihoods (server); //to clear the attempted paths
+
+  paths = heuristic->GetBestMultiPath (server, 5);
+  pathItr = paths.begin ();
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 5, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[4], "Got wrong second peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[6], "Got wrong fourth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[9], "Got wrong fifth peer!");
+  equality = pathItr == paths.end ();
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
+
+  // Now we change the threshold value to something very small
+  // and verify a different set of paths
+  heuristic->SetAttribute ("D", DoubleValue (0.0));
+  heuristic->ForceUpdateLikelihoods (server); //to clear the attempted paths
+
+  paths = heuristic->GetBestMultiPath (server, 5);
+  pathItr = paths.begin ();
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 5, "Not enough paths");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[4], "Got wrong second peer!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
+  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[6], "Got wrong fifth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[4], "Got wrong third peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[7], "Got wrong second peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[6], "Got wrong fifth peer!");
+  equality = pathItr == paths.end ();
+  NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
+}
+////////////////////////////////////////////////////////////////////////////////
+
 class TestIdealRonPathHeuristic : public TestCase
 {
 public:
@@ -2151,6 +2286,9 @@ public:
 GeocronTestSuite::GeocronTestSuite ()
   : TestSuite ("geocron", UNIT)
 {
+  // Build these nodes first so that their IDs are more friendly
+  GeoOverlayGenerator::GetInstance ();
+
   //basic data structs
   AddTestCase (new TestPeerEntry, TestCase::QUICK);
   AddTestCase (new TestPeerTable, TestCase::QUICK);
@@ -2165,6 +2303,7 @@ GeocronTestSuite::GeocronTestSuite ()
   AddTestCase (new TestDistRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestFarthestFirstRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestIdealRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestGsfordRonPathHeuristic, TestCase::QUICK);
 
   //network application / experiment stuff
   AddTestCase (new TestRonHeader, TestCase::QUICK);
