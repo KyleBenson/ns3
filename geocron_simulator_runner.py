@@ -80,7 +80,7 @@ def parse_args(args):
                         default=default_fprobs,
                         help='''failure probabilities to use (default=%(default)s)''')
     parser.add_argument('--heuristics', nargs='*', default=default_heuristics,
-                        help='''which heuristics to run (1,2,...MAX) (default=%(default)s)''')
+                        help='''which heuristics to run (e.g. rand, ideal, newreg...) (default=%(default)s)''')
     parser.add_argument('--nservers', default=['1'], nargs='+',
                         help='''number of servers for each node to attempt contact with when reporting data (default=%(default)s)''')
     parser.add_argument('--npaths', default=['1'], nargs='+',
