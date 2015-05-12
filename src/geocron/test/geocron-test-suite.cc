@@ -1924,7 +1924,92 @@ TestGeodivrpRonPathHeuristic::TestIntersection ()
 void
 TestGeodivrpRonPathHeuristic::TestAreaDistance ()
 {
+  {
+    // First, let's just test that we get the proper area returned
+    Ptr<RonPath> rp1 = Create<RonPath> (peerVector[8]), rp2 = Create<RonPath> (peerVector[9]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    Ptr<PhysicalPath> physPath1 = Create<PhysicalPath> (source, rp1);
+    Ptr<PhysicalPath> physPath2 = Create<PhysicalPath> (source, rp2);
+    NS_TEST_ASSERT_MSG_EQ (AreaDistanceGeodivrpRonPathHeuristic::GetArea (physPath1, physPath2), 20000, "Area not as expected!");
 
+    rp1 = Create<RonPath> (peerVector[1]), rp2 = Create<RonPath> (peerVector[2]);
+    rp1->AddHop (peerVector[8]);
+    rp2->AddHop (peerVector[8]);
+    physPath1 = Create<PhysicalPath> (source, rp1);
+    physPath2 = Create<PhysicalPath> (source, rp2);
+    NS_TEST_ASSERT_MSG_EQ (AreaDistanceGeodivrpRonPathHeuristic::GetArea (physPath1, physPath2), 10000, "Area not as expected!");
+
+    rp1 = Create<RonPath> (peerVector[5]), rp2 = Create<RonPath> (peerVector[9]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    physPath1 = Create<PhysicalPath> (source, rp1);
+    physPath2 = Create<PhysicalPath> (source, rp2);
+    NS_TEST_ASSERT_MSG_EQ (AreaDistanceGeodivrpRonPathHeuristic::GetArea (physPath1, physPath2), 13750, "Area not as expected!");
+
+    // Try one more with some overlapping links
+    rp1 = Create<RonPath> (peerVector[5]), rp2 = Create<RonPath> (peerVector[8]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    physPath1 = Create<PhysicalPath> (source, rp1);
+    physPath2 = Create<PhysicalPath> (source, rp2);
+    NS_TEST_ASSERT_MSG_EQ (AreaDistanceGeodivrpRonPathHeuristic::GetArea (physPath1, physPath2), 6250, "Area not as expected!");
+  }
+
+  // Next, let's verify that the min distance function works
+  {
+    Ptr<RonPath> rp1 = Create<RonPath> (peerVector[8]), rp2 = Create<RonPath> (peerVector[9]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    Ptr<PhysicalPath> physPath1 = Create<PhysicalPath> (source, rp1);
+    Ptr<PhysicalPath> physPath2 = Create<PhysicalPath> (source, rp2);
+    NS_TEST_ASSERT_MSG_EQ (AreaDistanceGeodivrpRonPathHeuristic::GetMinDistance (physPath1, physPath2), 50, "Minimum distance not as expected!");
+
+    rp1 = Create<RonPath> (peerVector[8]), rp2 = Create<RonPath> (peerVector[5]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    physPath1 = Create<PhysicalPath> (source, rp1);
+    physPath2 = Create<PhysicalPath> (source, rp2);
+    NS_TEST_ASSERT_MSG_EQ (AreaDistanceGeodivrpRonPathHeuristic::GetMinDistance (physPath1, physPath2), 0, "Minimum distance not as expected!");
+  }
+
+  // Finally, let's test the whole heuristic working
+  RonPathContainer paths;
+
+  Ptr<RonPeerTable> thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[8]);
+  thesePeers->AddPeer (peerVector[5]);
+
+  Ptr<GeodivrpRonPathHeuristic> heuristic = CreateObject<AreaDistanceGeodivrpRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[8], "Got wrong peer!");
+
+  // Try another round with more options
+  thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[5]);
+  thesePeers->AddPeer (peerVector[8]);
+  thesePeers->AddPeer (peerVector[9]);
+
+  heuristic = CreateObject<AreaDistanceGeodivrpRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[9], "Got wrong peer!");
+  // Here we should actually get 8 even though it's closer since the
+  // GeoDivRP heuristic picks the minimum diversity value when compared
+  // with all of the current paths in the current multipath
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[8], "Got wrong peer!");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
