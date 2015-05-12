@@ -60,6 +60,14 @@ public:
    * Useful for separating logic of setting path scores and not repeating previously tried ones,
    * paths of incorrect lengths, those in the current list of multipaths, etc. */
   virtual bool ShouldConsiderPath (Ptr<RonPath> path);
+  /** Used to break ties between two paths when their Likelihoods are equal
+   * in the GetBestPath() method.  The leftPath will be chosen if the value
+   * returned is <=0, the rightPath will be chosen otherwise.
+   *
+   * The default implementation simply returns a uniformly random value
+   * in the range [-.5,.5], which does leave a tiny possibility of
+   * not breaking the tie, but whatever... */
+  virtual double GetTieBreaker (Ptr<RonPath> leftPath, Ptr<RonPath> rightPath);
   /** Return the best path, according to the aggregate heuristics, to the destination. */
   Ptr<RonPath> GetBestPath (Ptr<PeerDestination> destination);
   /** Return the best multi-path, according to the aggregate heuristics, to the destination.

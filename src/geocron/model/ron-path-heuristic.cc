@@ -250,6 +250,12 @@ RonPathHeuristic::ShouldConsiderPath (Ptr<RonPath> path)
   return !PathAttempted (path) and path->GetN () > 1;
 }
 
+double
+RonPathHeuristic::GetTieBreaker (Ptr<RonPath> leftPath, Ptr<RonPath> rightPath)
+{
+  return m_random->GetValue (-0.5, 0.5);
+}
+
 Ptr<RonPath>
 RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
 {
@@ -279,11 +285,21 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
   for (; probs != (*m_masterLikelihoods)[destination].end (); probs++)
     {
       double nextLh = probs->second->GetLh ();
-      if (nextLh > bestLikelihood and ShouldConsiderPath (probs->first))
+      if (ShouldConsiderPath (probs->first))
+      {
+        if (nextLh > bestLikelihood)
         {
           bestPath = probs->first;
           bestLikelihood = nextLh;
         }
+        // Here we break ties, either randomly or in a heuristic-specified
+        // manner 
+        else if (nextLh == bestLikelihood and GetTieBreaker (bestPath, probs->first) <= 0.0)
+        {
+          bestPath = probs->first;
+          bestLikelihood = nextLh;
+        }
+      }
     }
 
   if (bestLikelihood <= 0.0 or bestPath == NULL)
@@ -321,6 +337,7 @@ RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t m
     NotifyLikelihoodUpdateNeeded (destination); //don't use force or we may get duplicates
   }
 
+#ifdef NS3_LOG_ENABLE
   uint32_t nitrs = 0;
   for (RonPathContainer::iterator itr = result.begin(); itr != result.end(); itr++)
   {
@@ -328,6 +345,8 @@ RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t m
     nitrs++;
   }
   NS_ASSERT_MSG (nitrs == result.size(), "not enough path iterations!");
+#endif
+
   return result;
   //TODO: perhaps ForceUpdateLikelihoods (destination) in order to
   //clear the attempted paths?
