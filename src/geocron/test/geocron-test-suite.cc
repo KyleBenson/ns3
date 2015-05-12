@@ -76,7 +76,7 @@ InternetStackHelper GetInternetStack (void)
 /////////   topology generation helper classes    ///////////////////////
 /////////////////////////////////////////////////////////////////////////
 
-class GeoOverlayGenerator
+class GeoOverlayGenerator : public SimpleRefCount<GeoOverlayGenerator>
 {
   /** This class creates a 6-node network as taken from the Rohrer2013 GeoDivRP paper */
 public:
@@ -86,98 +86,51 @@ public:
   NodeContainer nodes;
 
   Ptr<RonPeerTable> peerTable;
+  std::vector<NetDeviceContainer> devicePairs;
+  PointToPointHelper pointToPoint;
 
-  static GeoOverlayGenerator * GetInstance ()
+  GeoOverlayGenerator (uint32_t nNodes)
   {
-    static GeoOverlayGenerator * instance = new GeoOverlayGenerator ();
-    return instance;
-  }
-
-  static NodeContainer GetNodes ()
-  {
-    return GetInstance ()->nodes;
-  }
-
-  static PeerContainer GetPeers ()
-  {
-    return GetInstance ()->peers;
-  }
-
-  static Ptr<Node> GetNode (uint32_t number)
-  {
-    return GetInstance ()->nodes.Get(number);
-  }
-
-  // really only exists for sanity checks in constructor
-  Ptr<RonPeerEntry> DoGetPeer (uint32_t number)
-  {
-    return peers[number];
-  }
-
-  static Ptr<RonPeerEntry> GetPeer (uint32_t number)
-  {
-    return GetInstance ()->DoGetPeer (number);
-  }
-
-  GeoOverlayGenerator ()
-  {
-    //first, build a topology for us to use
-    nodes.Create (12);
+    nodes.Create (nNodes);
 
     // we'll track the pairs of devices we create for ease of installing Ipv4Addresses later
-    std::vector<NetDeviceContainer> devicePairs;
-    PointToPointHelper pointToPoint;
     pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+  }
 
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("7ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[9]));
-    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[9]));
-    devicePairs.push_back (pointToPoint.Install (nodes[8], nodes[10]));
 
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("6ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[7]));
-    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[7]));
-    devicePairs.push_back (pointToPoint.Install (nodes[5], nodes[6]));
+  static Ptr<GeoOverlayGenerator> GetDefault (Ipv4AddressHelper addressHelper = Ipv4AddressHelper ("11.1.0.0", "255.255.0.0"))
+  {
+    Ptr<GeoOverlayGenerator> instance = Create<GeoOverlayGenerator> (12);
 
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("5ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[1]));
-    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[1]));
-    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[10]));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[11]));
+    instance->SetLinkLatency (7);
+    instance->AddLink (0, 9);
+    instance->AddLink (2, 9);
+    instance->AddLink (8, 10);
 
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("4ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[3])); //so that 1 is chosen as lowest latency peer
+    instance->SetLinkLatency (6);
+    instance->AddLink (0, 7);
+    instance->AddLink (2, 7);
+    instance->AddLink (5, 6);
 
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("3ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[3]));
-    //devicePairs.push_back (pointToPoint.Install (nodes[1], nodes[5]));
-    devicePairs.push_back (pointToPoint.Install (nodes[2], nodes[5]));
-    devicePairs.push_back (pointToPoint.Install (nodes[0], nodes[8]));
+    instance->SetLinkLatency (5);
+    instance->AddLink (0, 1);
+    instance->AddLink (2, 1);
+    instance->AddLink (2, 10);
+    instance->AddLink (0, 11);
 
-    pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
-    devicePairs.push_back (pointToPoint.Install (nodes[3], nodes[4]));
-    devicePairs.push_back (pointToPoint.Install (nodes[4], nodes[5]));
-    devicePairs.push_back (pointToPoint.Install (nodes[11], nodes[6]));
-    //TODO: store the links as indexed by node numbers?
-    //std::map<uint32_t, std::map<uint32_t, Ptr<Channel> > links;
+    instance->SetLinkLatency (4);
+    instance->AddLink (0, 3);
 
-    InternetStackHelper internet = GetInternetStack ();
-    internet.Install (nodes);
+    instance->SetLinkLatency (3);
+    instance->AddLink (1, 3);
+    instance->AddLink (2, 5);
+    instance->AddLink (0, 8);
 
-    // make sure these addresses are different from those in any other network generators!
-    addressHelper = Ipv4AddressHelper ("11.1.0.0", "255.255.0.0");
-    for (std::vector<NetDeviceContainer>::iterator itr = devicePairs.begin ();
-        itr != devicePairs.end (); itr++)
-    {
-      addressHelper.Assign (*itr);
-      addressHelper.NewNetwork ();
-    }
+    instance->SetLinkLatency (2);
+    instance->AddLink (3, 4);
+    instance->AddLink (4, 5);
+    instance->AddLink (11, 6);
 
-    //TODO: set regions??
-    // Set the positions of the nodes using a list of positions in order of node #
-    //Ptr<MobilityModel> mobModel = CreateObject<ConstantPositionMobilityModel> ();
-    MobilityHelper mobHelper;
-    mobHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
     Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator> ();
     posAlloc->Add (Vector (0, 50, 0));
     posAlloc->Add (Vector (100, 50, 0));
@@ -191,13 +144,82 @@ public:
     posAlloc->Add (Vector (100, 75, 0));
     posAlloc->Add (Vector (250, 0, 0));
     posAlloc->Add (Vector (0, 150, 0));
+
+    instance->FinalizeNetwork (posAlloc, addressHelper);
+    return instance;
+  }
+
+  NodeContainer GetNodes ()
+  {
+    return nodes;
+  }
+
+  PeerContainer GetPeers ()
+  {
+    return peers;
+  }
+
+  Ptr<Node> GetNode (uint32_t number)
+  {
+    return nodes.Get(number);
+  }
+
+  // really only exists for sanity checks in constructor
+  Ptr<RonPeerEntry> DoGetPeer (uint32_t number)
+  {
+    return peers[number];
+  }
+
+  Ptr<RonPeerEntry> GetPeer (uint32_t number)
+  {
+    return DoGetPeer (number);
+  }
+
+  void SetLinkLatency (double delayMs)
+  {
+    pointToPoint.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (delayMs)));
+  }
+
+  void AddLink (uint32_t sourceNodeIndex, uint32_t destNodeIndex)
+  {
+    devicePairs.push_back (pointToPoint.Install (nodes[sourceNodeIndex], nodes[destNodeIndex]));
+    //TODO: store the links as indexed by node numbers?
+    //std::map<uint32_t, std::map<uint32_t, Ptr<Channel> > links;
+  }
+
+  /** Make sure you install all the links you wanted to add first!*/
+  void FinalizeNetwork (Ptr<PositionAllocator> posAlloc, Ipv4AddressHelper addressHelper = Ipv4AddressHelper ("11.1.0.0", "255.255.0.0"))
+  {
+    InternetStackHelper internet = GetInternetStack ();
+    internet.Install (nodes);
+
+    // make sure these addresses are different from those in any other network generators!
+    for (std::vector<NetDeviceContainer>::iterator itr = devicePairs.begin ();
+        itr != devicePairs.end (); itr++)
+    {
+      addressHelper.Assign (*itr);
+      addressHelper.NewNetwork ();
+    }
+
+    //TODO: set regions??
+    // Set the positions of the nodes using a list of positions in order of node #
+    MobilityHelper mobHelper;
+    mobHelper.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
     mobHelper.SetPositionAllocator (posAlloc);
     mobHelper.Install (nodes);
 
     // Create RonPeerEntries for each Node and save them
+    // WARNING: we did something dangerous here to improve readibility: 
+    // each peer has an id starting numbering at 0, but the nodes are going to
+    // have ns-3-assigned ID's starting at whatever the last node ID was!
+    // Please don't rely on this implementation as it's really only to make debugging
+    // easier when TEST messages print out the peer's ID.  This way you can match it
+    // up to your topology easier
+    uint32_t peerId = 0;
     for (NodeContainer::Iterator itr = nodes.Begin (); itr != nodes.End (); itr++)
     {
       Ptr<RonPeerEntry> newPeer = CreateObject<RonPeerEntry> (*itr);
+      newPeer->id = peerId++;
       peers.push_back (newPeer);
       (*itr)->AggregateObject (newPeer); //some heuristics rely on this!
     }
@@ -924,11 +946,12 @@ TestPhysicalPath::TestBasics ()
 void
 TestPhysicalPath::TestLatency ()
 {
-  Ptr<RonPath> ronPath = Create<RonPath> (GeoOverlayGenerator::GetPeer (3));
-  ronPath->AddHop (GeoOverlayGenerator::GetPeer (4));
-  ronPath->AddHop (GeoOverlayGenerator::GetPeer (5));
-  Ptr<PhysicalPath> path01 = Create<PhysicalPath> (GeoOverlayGenerator::GetPeer (0), Create<RonPath> (GeoOverlayGenerator::GetPeer (1))),
-    path0345 = Create<PhysicalPath> (GeoOverlayGenerator::GetPeer (0), ronPath);
+  Ptr<GeoOverlayGenerator> overlay = GeoOverlayGenerator::GetDefault (Ipv4AddressHelper ("12.1.0.0", "255.255.0.0"));
+  Ptr<RonPath> ronPath = Create<RonPath> (overlay->GetPeer (3));
+  ronPath->AddHop (overlay->GetPeer (4));
+  ronPath->AddHop (overlay->GetPeer (5));
+  Ptr<PhysicalPath> path01 = Create<PhysicalPath> (overlay->GetPeer (0), Create<RonPath> (overlay->GetPeer (1))),
+    path0345 = Create<PhysicalPath> (overlay->GetPeer (0), ronPath);
 
   NS_TEST_ASSERT_MSG_EQ (path01->GetLatency (), Time ("5ms"), "Latency not as expected!");
   NS_TEST_ASSERT_MSG_EQ (path0345->GetLatency (), Time ("8ms"), "Latency not as expected!");
@@ -1652,8 +1675,9 @@ private:
 TestGsfordRonPathHeuristic::TestGsfordRonPathHeuristic ()
   : TestCase ("Test GsfordRonPathHeuristic")
 {
-  nodes = GeoOverlayGenerator::GetNodes ();
-  peerVector = GeoOverlayGenerator::GetPeers ();
+  Ptr<GeoOverlayGenerator> overlay = GeoOverlayGenerator::GetDefault (Ipv4AddressHelper ("13.1.0.0", "255.255.0.0"));
+  nodes = overlay->GetNodes ();
+  peerVector = overlay->GetPeers ();
   peers = Create<RonPeerTable> ();
   peers->AddPeer (peerVector[1]);
   peers->AddPeer (peerVector[4]);
@@ -1739,6 +1763,170 @@ TestGsfordRonPathHeuristic::DoRun (void)
   equality = pathItr == paths.end ();
   NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+class TestGeodivrpRonPathHeuristic : public TestCase
+{
+public:
+  TestGeodivrpRonPathHeuristic ();
+  virtual ~TestGeodivrpRonPathHeuristic ();
+  NodeContainer nodes;
+  Ptr<RonPeerTable> peers;
+  PeerContainer peerVector;
+  Ptr<PeerDestination> server;
+  Ptr<RonPeerEntry> source;
+
+private:
+  virtual void DoRun (void);
+  void TestIntersection ();
+  void TestAreaDistance ();
+};
+
+
+
+TestGeodivrpRonPathHeuristic::TestGeodivrpRonPathHeuristic ()
+  : TestCase ("Test GeodivrpRonPathHeuristic")
+{
+  Ptr<GeoOverlayGenerator> overlay = Create<GeoOverlayGenerator> (13);
+
+  // These heuristics don't account for latency currently!
+  overlay->SetLinkLatency (4);
+  overlay->AddLink (0, 1);
+  overlay->AddLink (0, 2);
+  overlay->AddLink (0, 3);
+  overlay->AddLink (0, 7);
+  overlay->AddLink (0, 5);
+  overlay->AddLink (1, 4);
+  overlay->AddLink (1, 7);
+  overlay->AddLink (2, 8);
+  overlay->AddLink (3, 6);
+  overlay->AddLink (4, 8);
+  overlay->AddLink (5, 10);
+  overlay->AddLink (6, 9);
+  overlay->AddLink (7, 12);
+  overlay->AddLink (8, 10);
+  overlay->AddLink (9, 11);
+  overlay->AddLink (10, 12);
+  overlay->AddLink (11, 12);
+
+  Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator> ();
+  posAlloc->Add (Vector (100, 300, 0));
+  posAlloc->Add (Vector (0, 200, 0));
+  posAlloc->Add (Vector (100, 200, 0));
+  posAlloc->Add (Vector (200, 200, 0));
+  posAlloc->Add (Vector (50, 150, 0));
+  posAlloc->Add (Vector (150, 150, 0));
+  posAlloc->Add (Vector (200, 150, 0));
+  posAlloc->Add (Vector (0, 100, 0));
+  posAlloc->Add (Vector (100, 100, 0));
+  posAlloc->Add (Vector (200, 100, 0));
+  posAlloc->Add (Vector (100, 50, 0));
+  posAlloc->Add (Vector (150, 50, 0));
+  posAlloc->Add (Vector (100, 0, 0));
+
+  overlay->FinalizeNetwork (posAlloc, Ipv4AddressHelper ("14.1.0.0", "255.255.0.0"));
+
+  nodes = overlay->GetNodes ();
+  peerVector = overlay->GetPeers ();
+  peers = Create<RonPeerTable> ();
+  peers->AddPeer (peerVector[1]);
+  peers->AddPeer (peerVector[4]);
+  peers->AddPeer (peerVector[5]);
+  peers->AddPeer (peerVector[8]);
+  peers->AddPeer (peerVector[9]);
+
+  server = Create<PeerDestination> (peerVector[12]);
+
+  source = peerVector[0];
+}
+
+TestGeodivrpRonPathHeuristic::~TestGeodivrpRonPathHeuristic ()
+{
+}
+
+  void
+TestGeodivrpRonPathHeuristic::DoRun (void)
+{
+  TestIntersection ();
+  TestAreaDistance ();
+}
+
+void
+TestGeodivrpRonPathHeuristic::TestIntersection ()
+{
+  RonPathContainer paths;
+  //RonPathContainer::iterator pathItr;
+  //bool equality;
+
+  Ptr<RonPeerTable> thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[8]);
+
+  Ptr<GeodivrpRonPathHeuristic> heuristic = CreateObject<IntersectionGeodivrpRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 1);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 1, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[8], "Got wrong peer!");
+
+  // Try another round with more options
+  thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[5]);
+  thesePeers->AddPeer (peerVector[8]);
+
+  heuristic = CreateObject<IntersectionGeodivrpRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+  // This will test that we get the longer of the two possible paths that both have same intersection
+  // (the intersection heuristic favors longer paths due to scaling factor)
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[8], "Got wrong peer!");
+
+  // Try another round with more options
+  thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[5]);
+  thesePeers->AddPeer (peerVector[8]);
+  thesePeers->AddPeer (peerVector[9]);
+
+  heuristic = CreateObject<IntersectionGeodivrpRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+  // This will test that we get the longer of the two possible paths that both have same intersection
+  // (the intersection heuristic favors longer paths due to scaling factor)
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[9], "Got wrong peer!");
+
+  // Reset the heuristic and try getting 3 this time
+  heuristic->ForceUpdateLikelihoods (server);
+
+  paths = heuristic->GetBestMultiPath (server, 3);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 3, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+  // This will test that we get the longer of the two possible paths that both have same intersection
+  // (the intersection heuristic favors longer paths due to scaling factor)
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[9], "Got wrong peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[8], "Got wrong peer!");
+}
+
+void
+TestGeodivrpRonPathHeuristic::TestAreaDistance ()
+{
+
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 class TestIdealRonPathHeuristic : public TestCase
@@ -2286,9 +2474,6 @@ public:
 GeocronTestSuite::GeocronTestSuite ()
   : TestSuite ("geocron", UNIT)
 {
-  // Build these nodes first so that their IDs are more friendly
-  GeoOverlayGenerator::GetInstance ();
-
   //basic data structs
   AddTestCase (new TestPeerEntry, TestCase::QUICK);
   AddTestCase (new TestPeerTable, TestCase::QUICK);
@@ -2304,6 +2489,7 @@ GeocronTestSuite::GeocronTestSuite ()
   AddTestCase (new TestFarthestFirstRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestIdealRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestGsfordRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestGeodivrpRonPathHeuristic, TestCase::QUICK);
 
   //network application / experiment stuff
   AddTestCase (new TestRonHeader, TestCase::QUICK);
