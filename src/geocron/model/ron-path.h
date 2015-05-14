@@ -73,6 +73,11 @@ public:
   /** Returns the final destination peer(s), which is currently just the last added destination. */
   //TODO: labels to identify which hop... or is that just peerID?
   Ptr<PeerDestination> GetDestination () const;
+  /** Convenience function that gets the first peer at the first destination
+   * since a lot of the codebase does this pattern and using iterators is ugly. */
+  Ptr<RonPeerEntry> GetFirstPeer () const;
+  /** Another convenience function .*/
+  Ptr<RonPeerEntry> GetDestinationPeer () const;
 
   uint32_t GetN () const;
 

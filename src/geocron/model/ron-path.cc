@@ -106,6 +106,20 @@ RonPath::GetDestination () const
 }
 
 
+Ptr<RonPeerEntry>
+RonPath::GetFirstPeer () const
+{
+  return *((*Begin ())->Begin ());
+}
+
+
+Ptr<RonPeerEntry>
+RonPath::GetDestinationPeer () const
+{
+  return *GetDestination ()->Begin ();
+}
+
+
 std::ostream&
 operator<< (std::ostream& os, RonPath const& path)
 {
