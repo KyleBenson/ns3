@@ -294,7 +294,7 @@ RonPathHeuristic::GetBestPath (Ptr<PeerDestination> destination)
         }
         // Here we break ties, either randomly or in a heuristic-specified
         // manner 
-        else if (nextLh == bestLikelihood and GetTieBreaker (bestPath, probs->first) <= 0.0)
+        else if (nextLh == bestLikelihood and bestPath != NULL and GetTieBreaker (bestPath, probs->first) <= 0.0)
         {
           bestPath = probs->first;
           bestLikelihood = nextLh;
