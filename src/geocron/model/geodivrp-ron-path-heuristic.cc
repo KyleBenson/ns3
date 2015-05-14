@@ -50,6 +50,7 @@ GeodivrpRonPathHeuristic::GetTypeId (void)
   return tid;
 }
 
+
 double
 GeodivrpRonPathHeuristic::GetTieBreaker (Ptr<RonPath> leftPath, Ptr<RonPath> rightPath)
 {

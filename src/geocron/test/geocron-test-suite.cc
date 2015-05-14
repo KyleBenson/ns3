@@ -2014,6 +2014,177 @@ TestGeodivrpRonPathHeuristic::TestAreaDistance ()
 
 ////////////////////////////////////////////////////////////////////////////////
 
+class TestPeerAreaRonPathHeuristic : public TestCase
+{
+public:
+  TestPeerAreaRonPathHeuristic ();
+  virtual ~TestPeerAreaRonPathHeuristic ();
+  NodeContainer nodes;
+  Ptr<RonPeerTable> peers;
+  PeerContainer peerVector;
+  Ptr<PeerDestination> server;
+  Ptr<RonPeerEntry> source;
+
+private:
+  virtual void DoRun (void);
+  void TestIntersection ();
+  void TestAreaDistance ();
+};
+
+
+
+TestPeerAreaRonPathHeuristic::TestPeerAreaRonPathHeuristic ()
+  : TestCase ("Test PeerAreaRonPathHeuristic")
+{
+  // NOTE: this is the same configuration as the TestGeodivrpRonPathHeuristic!
+  Ptr<GeoOverlayGenerator> overlay = Create<GeoOverlayGenerator> (13);
+
+  // These heuristics don't account for latency currently!
+  overlay->SetLinkLatency (4);
+  overlay->AddLink (0, 1);
+  overlay->AddLink (0, 2);
+  overlay->AddLink (0, 3);
+  overlay->AddLink (0, 7);
+  overlay->AddLink (0, 5);
+  overlay->AddLink (1, 4);
+  overlay->AddLink (1, 7);
+  overlay->AddLink (2, 8);
+  overlay->AddLink (3, 6);
+  overlay->AddLink (4, 8);
+  overlay->AddLink (5, 10);
+  overlay->AddLink (6, 9);
+  overlay->AddLink (7, 12);
+  overlay->AddLink (8, 10);
+  overlay->AddLink (9, 11);
+  overlay->AddLink (10, 12);
+  overlay->AddLink (11, 12);
+
+  Ptr<ListPositionAllocator> posAlloc = CreateObject<ListPositionAllocator> ();
+  posAlloc->Add (Vector (100, 300, 0));
+  posAlloc->Add (Vector (0, 200, 0));
+  posAlloc->Add (Vector (100, 200, 0));
+  posAlloc->Add (Vector (200, 200, 0));
+  posAlloc->Add (Vector (50, 150, 0));
+  posAlloc->Add (Vector (150, 150, 0));
+  posAlloc->Add (Vector (200, 150, 0));
+  posAlloc->Add (Vector (0, 100, 0));
+  posAlloc->Add (Vector (100, 100, 0));
+  posAlloc->Add (Vector (200, 100, 0));
+  posAlloc->Add (Vector (100, 50, 0));
+  posAlloc->Add (Vector (150, 50, 0));
+  posAlloc->Add (Vector (100, 0, 0));
+
+  overlay->FinalizeNetwork (posAlloc, Ipv4AddressHelper ("15.1.0.0", "255.255.0.0"));
+
+  nodes = overlay->GetNodes ();
+  peerVector = overlay->GetPeers ();
+  peers = Create<RonPeerTable> ();
+  peers->AddPeer (peerVector[1]);
+  peers->AddPeer (peerVector[4]);
+  peers->AddPeer (peerVector[5]);
+  peers->AddPeer (peerVector[8]);
+  peers->AddPeer (peerVector[9]);
+
+  server = Create<PeerDestination> (peerVector[12]);
+
+  source = peerVector[0];
+}
+
+TestPeerAreaRonPathHeuristic::~TestPeerAreaRonPathHeuristic ()
+{
+}
+
+void
+TestPeerAreaRonPathHeuristic::DoRun (void)
+{
+  // We need an instance of the heuristic so that it knows the source
+  // peer, which is not included in the RonPath normally.
+  Ptr<RonPeerTable> thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[8]);
+  thesePeers->AddPeer (peerVector[5]);
+
+  Ptr<PeerAreaRonPathHeuristic> heuristic = CreateObject<PeerAreaRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  // First, let's just test that we get the proper area returned
+  {
+    Ptr<RonPath> rp1 = Create<RonPath> (peerVector[8]), rp2 = Create<RonPath> (peerVector[9]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    NS_TEST_ASSERT_MSG_EQ (heuristic->GetArea (rp1, rp2), 300*100/2, "Area not as expected!");
+
+    rp1 = Create<RonPath> (peerVector[1]), rp2 = Create<RonPath> (peerVector[2]);
+    rp1->AddHop (peerVector[8]);
+    rp2->AddHop (peerVector[8]);
+    NS_TEST_ASSERT_MSG_EQ (heuristic->GetArea (rp1, rp2), 200*100/2, "Area not as expected!");
+
+    rp1 = Create<RonPath> (peerVector[5]), rp2 = Create<RonPath> (peerVector[9]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    NS_TEST_ASSERT_MSG_EQ (heuristic->GetArea (rp1, rp2), (300*100/2) - (300*50/2), "Area not as expected!");
+
+    // Try one more with some overlapping links
+    rp1 = Create<RonPath> (peerVector[5]), rp2 = Create<RonPath> (peerVector[8]);
+    rp1->AddHop (server);
+    rp2->AddHop (server);
+    NS_TEST_ASSERT_MSG_EQ (heuristic->GetArea (rp1, rp2), 300*50/2, "Area not as expected!");
+  }
+
+  // Finally, let's test the whole heuristic working
+  RonPathContainer paths;
+
+  paths = heuristic->GetBestMultiPath (server, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+
+  // Try another round with more options
+  thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[5]);
+  thesePeers->AddPeer (peerVector[8]);
+  thesePeers->AddPeer (peerVector[9]);
+
+  heuristic = CreateObject<PeerAreaRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 2);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 2, "Not enough paths");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[9], "Got wrong peer!");
+  // Here we expect to get 5 rather than 4, despite identical areas
+  // with non-overlay path and with 9, because the path to 5
+  // is shorter than that to 4.
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+
+  // One more time.  1 should come before 9
+  thesePeers = Create<RonPeerTable> ();
+  thesePeers->AddPeer (peerVector[1]);
+  thesePeers->AddPeer (peerVector[5]);
+  thesePeers->AddPeer (peerVector[6]);
+  thesePeers->AddPeer (peerVector[8]);
+  thesePeers->AddPeer (peerVector[9]);
+
+  heuristic = CreateObject<PeerAreaRonPathHeuristic> ();
+  heuristic->SetPeerTable (thesePeers);
+  heuristic->SetSourcePeer (source);
+  heuristic->MakeTopLevel ();
+
+  paths = heuristic->GetBestMultiPath (server, 3);
+  NS_TEST_ASSERT_MSG_EQ (paths.size (), 3, "Not enough paths");
+  // 1 beats 6/9 as shorter path
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong peer!");
+  // 6 next as its closer than 6 and has better area than 5
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[6], "Got wrong peer!");
+  // 5 next as its area is better than the one made between 6 and 9
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[5], "Got wrong peer!");
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
 class TestIdealRonPathHeuristic : public TestCase
 {
 public:
@@ -2575,6 +2746,7 @@ GeocronTestSuite::GeocronTestSuite ()
   AddTestCase (new TestIdealRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestGsfordRonPathHeuristic, TestCase::QUICK);
   AddTestCase (new TestGeodivrpRonPathHeuristic, TestCase::QUICK);
+  AddTestCase (new TestPeerAreaRonPathHeuristic, TestCase::QUICK);
 
   //network application / experiment stuff
   AddTestCase (new TestRonHeader, TestCase::QUICK);
