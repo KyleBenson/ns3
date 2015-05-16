@@ -81,7 +81,11 @@ GsfordRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
       Time thisLatency = physPath->GetLatency ();
       // Need to do 1/latency so that low latency paths get higher likelihood
       uint64_t millis = thisLatency.GetMilliSeconds ();
-      NS_ASSERT_MSG (millis != 0, "Link with 0ms latency, this will cause a divide by zero error!");
+      if (millis != 0)
+      {
+          NS_LOG_DEBUG ("Link with 0ms latency, this will cause a divide by zero error so setting to 1!");
+          millis = 1;
+      }
       //NS_LOG_UNCOND ("Latency LH for peer " << *(*(*path->Begin ())->Begin ()) << " is " << 1.0/millis);
       return 1.0/millis;
   }
