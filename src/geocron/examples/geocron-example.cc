@@ -139,7 +139,11 @@ main (int argc, char *argv[])
         {
           //get short name from typeid
           TypeId::AttributeInformation info;
-          NS_ASSERT (tid.LookupAttributeByName ("ShortName", &info));
+          if (!tid.LookupAttributeByName ("ShortName", &info))
+          {
+              NS_LOG_DEBUG ("Skipping RonPathHeuristic with no ShortName, probably abstract");
+              continue;
+          }
           StringValue name = *(DynamicCast<const StringValue> (info.initialValue));
           //info.checker->Check (name);
           heuristicMap[(std::string)name.Get ()] = tid;
