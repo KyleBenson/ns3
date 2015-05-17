@@ -140,7 +140,7 @@ GsfordRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
     NS_ASSERT_MSG (deltaLh > 0, "Delta LH value <= 0!");
 
     uint64_t latency = thisPhysPath->GetLatency ().GetMilliSeconds ();
-    NS_ASSERT_MSG (latency > 0, "Latency value <= 0!  Please don't break the laws of physics in this simulation");
+    //NS_ASSERT_MSG (latency > 0, "Latency value <= 0!  Please don't break the laws of physics in this simulation");
 
     // We add one to the latency to ensure lhLatencyComponent fits in range [0, deltaLh)
     double lhLatencyComponent = deltaLh / (latency + 1);
