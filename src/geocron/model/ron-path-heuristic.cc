@@ -329,13 +329,25 @@ RonPathHeuristic::GetBestMultiPath (Ptr<PeerDestination> destination, uint32_t m
   RonPathContainer result;
   for (; multipathFanout > 0; multipathFanout--)
   {
-    //TODO: decide how to tell heuristic that it shouldn't give us this same path again, possibly without using NotifyTimeout???
-    Ptr<RonPath> nextDest = GetBestPath (destination);
+    // Go ahead and return what we have if no more peers available
+    Ptr<RonPath> nextDest; 
+    try
+    {
+        nextDest = GetBestPath (destination);
+    }
+    catch (NoValidPeerException e)
+    {
+        NS_LOG_LOGIC ("Returning available peers for multipath, only found " << result.size () << " out of requested " << multipathFanout);
+        break;
+    }
     NS_ASSERT_MSG (nextDest->GetN () > 1, "Got path of length " << nextDest->GetN () << " in GetBestMultiPath, which is no good!");
     result.push_back (nextDest);
     m_currentMultiPath.push_back (nextDest);
     NotifyLikelihoodUpdateNeeded (destination); //don't use force or we may get duplicates
   }
+
+  if (result.size () == 0)
+      throw NoValidPeerException ();
 
 #ifdef NS3_LOG_ENABLE
   uint32_t nitrs = 0;
