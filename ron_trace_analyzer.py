@@ -224,6 +224,9 @@ class Parameters:
         if os.path.isfile(name):
             params.run = parts[-1]
             parts = parts[:-1]
+        # if you added a '/' to the end of the --dirs option, we'll have an extra blank component at the end
+        if not parts[-1]:
+            parts = parts[:-1]
 
         params.heuristic = parts[Parameters.HEURISTIC_INDEX]
         params.nservers = parts[Parameters.NSERVERS_INDEX]
@@ -441,7 +444,7 @@ class TraceGroup:
     def __init__(self,folder=None, normalize=True):
         self.normalize = normalize
         if folder:
-            self.params = Parameters.parseFolderHierarchy(folder)
+            self.params = Parameters.parseFolderHierarchy(folder, False)
             self.name = self.getNameByParams(self.params)
         else:
             self.name = "Group"
