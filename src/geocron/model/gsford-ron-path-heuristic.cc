@@ -140,12 +140,13 @@ GsfordRonPathHeuristic::GetLikelihood (Ptr<RonPath> path)
     NS_ASSERT_MSG (deltaLh > 0, "Delta LH value <= 0!");
 
     uint64_t latency = thisPhysPath->GetLatency ().GetMilliSeconds ();
-    //NS_ASSERT_MSG (latency > 0, "Latency value <= 0!  Please don't break the laws of physics in this simulation");
+    NS_ASSERT_MSG (latency >= 0, "Latency value < 0!  Please don't break the laws of physics in this simulation");
 
-    // We add one to the latency to ensure lhLatencyComponent fits in range [0, deltaLh)
-    double lhLatencyComponent = deltaLh / (latency + 1);
+    // We add two to the latency to ensure lhLatencyComponent fits in range [0, deltaLh)
+    // Adding 1 wasn't enough as BRITE apparently can create paths with latency 0
+    double lhLatencyComponent = deltaLh / (latency + 2);
     double finalLh = lh + lhLatencyComponent;
-    NS_ASSERT_MSG (lhLatencyComponent >= 0 and lhLatencyComponent < deltaLh, "Likelihood latency component not in expected range!");
+    NS_ASSERT_MSG (lhLatencyComponent > 0 and lhLatencyComponent < deltaLh, "Likelihood latency component not in expected range!");
     NS_LOG_DEBUG ("LH for peer " << *(*(*path->Begin ())->Begin ()) << " is " << finalLh);
     return finalLh;
   }
