@@ -1112,11 +1112,15 @@ TestRonPathHeuristic::DoRun (void)
   equality = *paths[1] == *nextPaths[0];
   NS_TEST_ASSERT_MSG_NE (equality, true, "second round of paths from GetBestMultiPath should have the same peers!");
 
-  // verify that requesting too many paths throws an exception
+  // verify that requesting too many paths returns all the available ones
   try
   {
-    h0->GetBestMultiPath (dest, 999999999);
-    NS_TEST_ASSERT_MSG_EQ (true, false, "requesting too many paths from GetBestMultiPath should throw exception!");
+    // reset heuristic's likelihoods first
+    h0->ForceUpdateLikelihoods (dest);
+    nextPaths = h0->GetBestMultiPath (dest, 999999999);
+    // NOTE: we subtract two from all peers as one is source and one is destination
+    NS_TEST_ASSERT_MSG_EQ (nextPaths.size (), GridGenerator::GetPeers ().size () - 2, "should get all the remaining paths when requesting too many peers from GetBestMultiPath");
+    //NS_TEST_ASSERT_MSG_EQ (true, false, "requesting too many paths from GetBestMultiPath should throw exception!");
   }
   catch (RonPathHeuristic::NoValidPeerException e)
     {}
@@ -1697,6 +1701,8 @@ TestGsfordRonPathHeuristic::~TestGsfordRonPathHeuristic ()
 void
 TestGsfordRonPathHeuristic::DoRun (void)
 {
+  // WARNING: don't use RonPathContainer iterators as they throw cryptic
+  // errors when an assertion fails
   Ptr<GsfordRonPathHeuristic> heuristic = CreateObject<GsfordRonPathHeuristic> ();
   heuristic->SetAttribute ("D", DoubleValue (50.0));
   heuristic->SetPeerTable (peers);
@@ -1704,43 +1710,27 @@ TestGsfordRonPathHeuristic::DoRun (void)
   heuristic->MakeTopLevel ();
 
   RonPathContainer paths;
-  RonPathContainer::iterator pathItr;
-  bool equality;
 
   paths = heuristic->GetBestMultiPath (server, 5);
-  pathItr = paths.begin ();
   NS_TEST_ASSERT_MSG_EQ (paths.size (), 5, "Not enough paths");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[6], "Got wrong second peer!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[4], "Got wrong fifth peer!");
 
-  // TODO: figure out what the bug was that resulted in the last path iterator being corrupted!
-  // Strangely, it seems to only appear when the peer comparison evaluates to false?  But I've also
-  // seen it appear just from dereferencing an iterator so something stranger must be up....
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[6], "Got wrong second peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[4], "Got wrong fifth peer!");
-  equality = pathItr == paths.end ();
-  NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[6], "Got wrong second peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[4], "Got wrong fifth peer!");
 
   // Now we change the threshold value and verify a different set of paths
   heuristic->SetAttribute ("D", DoubleValue (25.0));
   heuristic->ForceUpdateLikelihoods (server); //to clear the attempted paths
 
   paths = heuristic->GetBestMultiPath (server, 5);
-  pathItr = paths.begin ();
   NS_TEST_ASSERT_MSG_EQ (paths.size (), 5, "Not enough paths");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[4], "Got wrong second peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[6], "Got wrong fourth peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[9], "Got wrong fifth peer!");
-  equality = pathItr == paths.end ();
-  NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[4], "Got wrong second peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[6], "Got wrong fourth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[9], "Got wrong fifth peer!");
 
   // Now we change the threshold value to something very small
   // and verify a different set of paths
@@ -1748,20 +1738,12 @@ TestGsfordRonPathHeuristic::DoRun (void)
   heuristic->ForceUpdateLikelihoods (server); //to clear the attempted paths
 
   paths = heuristic->GetBestMultiPath (server, 5);
-  pathItr = paths.begin ();
   NS_TEST_ASSERT_MSG_EQ (paths.size (), 5, "Not enough paths");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[4], "Got wrong second peer!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
-  //NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[6], "Got wrong fifth peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[4], "Got wrong third peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[7], "Got wrong second peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
-  NS_TEST_ASSERT_MSG_EQ ((*(*(*(*pathItr++)->Begin ())->Begin ())), *peerVector[6], "Got wrong fifth peer!");
-  equality = pathItr == paths.end ();
-  NS_TEST_ASSERT_MSG_EQ (equality, true, "Iterator not at end: more paths than expected?");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[0])->Begin ())->Begin ())), *peerVector[1], "Got wrong first peer of lowest latency!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[1])->Begin ())->Begin ())), *peerVector[4], "Got wrong second peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[2])->Begin ())->Begin ())), *peerVector[7], "Got wrong third peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[3])->Begin ())->Begin ())), *peerVector[9], "Got wrong fourth peer!");
+  NS_TEST_ASSERT_MSG_EQ ((*(*(*(paths[4])->Begin ())->Begin ())), *peerVector[6], "Got wrong fifth peer!");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
