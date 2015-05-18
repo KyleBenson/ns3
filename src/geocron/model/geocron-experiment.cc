@@ -20,6 +20,7 @@
 #include <iomanip>
 #include <fstream>
 #include <ctime>
+#include <cmath>
 #include <unistd.h>
 #include <boost/functional/hash.hpp>
 
@@ -737,6 +738,13 @@ GeocronExperiment::ApplyFailureModel () {
        nodeItr != disasterNodes[currLocation].end (); nodeItr++)
     {
       Ptr<Node> node = nodeItr->second;
+
+      //TODO: set this based on disaster location
+      //Vector disasterLocation = Vector (100, 100, 0);
+      //Vector disasterLocation = GetRegionHelper ()->GetLocation (currLocation);
+      //double distance = CalculateDistance (GetLocation (node), disasterLocation);
+      //double distanceFactor = std::pow (distance, -0.64);
+
       // Fail nodes within the disaster region with some probability
       if (random->GetValue () < currFprob)
         {
