@@ -88,7 +88,7 @@ main (int argc, char *argv[])
   // Parse string args for possible multiple arguments
   typedef boost::tokenizer<boost::char_separator<char> > 
     tokenizer;
-  boost::char_separator<char> sep("-");
+  boost::char_separator<char> sep("~");
   
   std::vector<double> * failureProbabilities = new std::vector<double> ();
   tokenizer tokens(fail_prob, sep);
@@ -130,7 +130,9 @@ main (int argc, char *argv[])
   std::map<std::string, TypeId> heuristicMap;
 
   /* Here we need to find all of the available RonPathHeuristic derived classes.
-     ns-3's TypeId system makes this easier to do. */
+     ns-3's TypeId system makes this easier to do. 
+     We iterate over all the TypeIds and collect all available heuristics
+     in a map by ShortName. */
   for (uint32_t i = 0; i < TypeId::GetRegisteredN (); i++)
     {
       TypeId tid = TypeId::GetRegistered (i);
@@ -158,12 +160,26 @@ main (int argc, char *argv[])
   for (tokenizer::iterator tokIter = tokens.begin();
        tokIter != tokens.end(); ++tokIter)
     {
-      //std::cout << *tokIter <<std::endl; 
-      if (heuristicMap.count ((std::string)(*tokIter)))
+      // We need to get the optional parameters specified in brackets
+      // separated from the ShortName
+      std::string thisString = (std::string)(*tokIter);
+      size_t paramStartIndex = thisString.find ("[");
+      std::string shortName = thisString.substr (0, paramStartIndex);
+      std::string params;
+
+      if (paramStartIndex != std::string::npos)
+        params = thisString.substr (thisString.find ("["));
+
+      if (heuristicMap.count (shortName))
         {
           ObjectFactory * fact = new ObjectFactory ();
-          fact->SetTypeId (heuristicMap[*tokIter]);
-          //TODO: use 'Set (std::string name, const AttributeValue &value)' for heuristic params
+
+          // We set the ObjectFactory by serializing it from a stringbuffer,
+          // which will help us by parsing the attributes
+          std::stringstream factorySS;
+          factorySS << heuristicMap[shortName] << params;
+          factorySS >> *fact;
+
           heuristics->push_back (fact);
         }
     }

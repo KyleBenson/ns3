@@ -80,7 +80,8 @@ def parse_args(args):
                         default=default_fprobs,
                         help='''failure probabilities to use (default=%(default)s)''')
     parser.add_argument('--heuristics', nargs='*', default=default_heuristics,
-                        help='''which heuristics to run (e.g. rand, ideal, newreg...) (default=%(default)s)''')
+                        help='''which heuristics to run, optionally with parameters specified within brackets
+                        (e.g. rand, ideal, gsford[D=10], areageodivrp[A=0.5,B=1.5]...) (default=%(default)s)''')
     parser.add_argument('--nservers', default=['1'], nargs='+',
                         help='''number of servers for each node to attempt contact with when reporting data (default=%(default)s)''')
     parser.add_argument('--npaths', default=['1'], nargs='+',
@@ -160,10 +161,15 @@ def parse_args(args):
 
 def makecmds(args):
     # convert commands to pass to geocron-simulator
-    fprobs = '"%s"' % '-'.join(args.fprobs)
-    heuristics = '"%s"' % '-'.join(args.heuristics)
-    npaths = '"%s"' % '-'.join(args.npaths)
-    nservers = '"%s"' % '-'.join(args.nservers)
+    separator = '~'
+    fprobs = '"%s"' % separator.join(args.fprobs)
+    npaths = '"%s"' % separator.join(args.npaths)
+    nservers = '"%s"' % separator.join(args.nservers)
+
+    # the heuristics can take parameters so we turn the , into |,
+    # which is how ns-3 expects them to be separated
+    heuristics = '"%s"' % separator.join(args.heuristics)
+    heuristics = heuristics.replace(",", "|")
 
     # determine # procs for each topology
     procs_per_topology = 1
