@@ -905,25 +905,39 @@ GeocronExperiment::SetNextServers () {
 Ptr<RonPeerTable>
 GeocronExperiment::GetPeerTableForPeer (Ptr<RonPeerEntry> peer)
 {
-  //TODO: cache this object?
+  // We want to return the same peer table for a given peer so that each
+  // heuristic will have an identical table.  We regenerate the tables
+  // each time we are back to the first number of servers as that indicates
+  // a new run and new application of the failure model, hence a new round
+  // of all the parameters that should be compared with the same table
   static std::vector<Ptr<RonPeerEntry> > peerVector (overlayPeers->Begin (), overlayPeers->End ());
-  // randomly shuffle the peerVector and choose c*log(n) peers to add to a new RonPeerTable
-  std::random_shuffle (peerVector.begin (), peerVector.end ());
-  Ptr<RonPeerTable> newTable = Create<RonPeerTable> ();
+  static std::map<uint32_t, Ptr<RonPeerTable> > cachedPeerTables;
 
-  uint32_t peersAdded = 0, maxPeers = peerTableSizeScalingFactor * std::log(overlayPeers->GetN ());
-  NS_LOG_LOGIC ("Generating table of " << maxPeers << " peers for peer " << peer->id);
-
-  for (; peersAdded < maxPeers; peersAdded++)
+  // Check if we should generate a new table
+  // TODO: do this check in a less-hacky manner
+  if (currNServers == nservers->at (0) or cachedPeerTables.count (peer->id) == 0)
   {
-    newTable->AddPeer (peerVector[peersAdded]);
-  }
+    // randomly shuffle the peerVector and choose c*log(n) peers to add to a new RonPeerTable
+    std::random_shuffle (peerVector.begin (), peerVector.end ());
+    Ptr<RonPeerTable> newTable = Create<RonPeerTable> ();
 
-  // add one more if the random ones included the peer in question
-  // TODO: remove the other peer? doesn't seem to hurt anything for now...
-  if (newTable->IsInTable (peer))
-    newTable->AddPeer (peerVector[peersAdded]);
-  return newTable;
+    uint32_t peersAdded = 0, maxPeers = peerTableSizeScalingFactor * std::log(overlayPeers->GetN ());
+    NS_LOG_LOGIC ("Generating table of " << maxPeers << " peers for peer " << peer->id);
+
+    for (; peersAdded < maxPeers; peersAdded++)
+    {
+      newTable->AddPeer (peerVector[peersAdded]);
+    }
+
+    // add one more if the random ones included the peer in question
+    // TODO: remove the other peer? doesn't seem to hurt anything for now...
+    if (newTable->IsInTable (peer))
+      newTable->AddPeer (peerVector[peersAdded]);
+
+    cachedPeerTables[peer->id] = newTable;
+    return newTable;
+  }
+  return cachedPeerTables[peer->id];
 }
 
 
