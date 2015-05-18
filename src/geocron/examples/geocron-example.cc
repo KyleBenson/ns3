@@ -180,6 +180,12 @@ main (int argc, char *argv[])
           factorySS << heuristicMap[shortName] << params;
           factorySS >> *fact;
 
+          // We also set the SummaryName to be exactly what was passed
+          // in by the user so that it can be used for the output
+          // file name.  TODO: this in some other manner if necessary?
+          StringValue name (thisString);
+          fact->Set ("SummaryName", name);
+
           heuristics->push_back (fact);
         }
     }

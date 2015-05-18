@@ -424,14 +424,13 @@ GeocronExperiment::AutoSetTraceFile ()
   newTraceFile /= boost::lexical_cast<std::string> (currNServers);
 
   // extract unique filename from heuristic to summarize parameters, aggregations, etc.
-  TypeId::AttributeInformation info;
-  NS_ASSERT (currHeuristic->GetTypeId ().LookupAttributeByName ("SummaryName", &info));
-  //StringValue summary;
-  //TODO: get this working with a checker
-  StringValue summary = *(DynamicCast<const StringValue> (info.initialValue));
-  //info.checker->Check (summary);
-  NS_ASSERT_MSG (summary.Get () != "", "Blank SummaryName!");
-  newTraceFile /= summary.Get ();
+  // Do this by creating an instance of the current heuristic so that
+  // we can call GetAttribute on it (ObjectFactory has no Get())
+  StringValue info;
+  Ptr<Object> heur = currHeuristic->Create ();
+  heur->GetAttribute ("SummaryName", info);
+  NS_ASSERT_MSG (info.Get () != "", "Blank SummaryName!");
+  newTraceFile /= info.Get ();
 
   // set output number if start_run_number is specified
   uint32_t outnum = currRun;
