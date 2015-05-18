@@ -740,13 +740,27 @@ if __name__ == '__main__':
     nextTitleIdx = 0
 
     if args.time:
-        '''Cumulative number of ACKs at each time step'''
+        '''Cumulative number of received packets at each time step'''
         markers = 'x.*+do^s1_|'
+        cumulativeTimes = []
+        labels = []
         for i,g in enumerate(traceGroups):
             if g.getNNodes() == 0:
                 print "No nodes found in group # %d (%s). Skipping" % (i, g.name)
                 continue
-            plt.plot(*cumulative(g.getRecvTimes()), label=g.name, marker=markers[i%len(markers)])
+            cumulativeTimes.append(cumulative(g.getRecvTimes()))
+            labels.append(g.name)
+
+        # now we want to extend all of the times we've received so that they
+        # all reach to the same x-value to make the plots look nicer
+        lastTimes = [timeValue[0][-1] for timeValue in cumulativeTimes]
+        latestTime = max(lastTimes)
+        for i,t in enumerate(cumulativeTimes):
+            # append the latest time of all the groups to this one, but use
+            # this group's highest value
+            t[0].append(latestTime)
+            t[1].append(t[1][-1])
+            plt.plot(*t, label=labels[i], marker=markers[i%len(markers)])
 
         # If requested, plot the ACKs for the non-RON case, which is just a horizontal line of the number of direct ACKs
         if args.non_ron:
