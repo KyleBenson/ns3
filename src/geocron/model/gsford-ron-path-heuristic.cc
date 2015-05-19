@@ -45,7 +45,7 @@ GsfordRonPathHeuristic::GetTypeId (void)
                    MakeStringAccessor (&GsfordRonPathHeuristic::m_shortName),
                    MakeStringChecker ())
     .AddAttribute ("D", "Threshold at which two nodes are considered too close to be geo-diverse in path",
-                   DoubleValue (25.0),
+                   DoubleValue (30.0),
                    MakeDoubleAccessor (&GsfordRonPathHeuristic::m_distanceThreshold),
                    MakeDoubleChecker<double> ())
     ;
