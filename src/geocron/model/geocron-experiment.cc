@@ -414,7 +414,6 @@ GeocronExperiment::AutoSetTraceFile ()
 {
   // The trace files should look like:
   // ron_output/topology/disaster_location/fprob/nservers/heuristic/run#.out
-  NS_LOG_UNCOND ("folder is " << traceFolderName);
 
   boost::filesystem::path newTraceFile (traceFolderName);
   newTraceFile /= boost::filesystem::path(topologyFile).stem ();
