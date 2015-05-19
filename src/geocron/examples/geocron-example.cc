@@ -29,7 +29,6 @@ NS_LOG_COMPONENT_DEFINE ("GeocronDisasterSimulation");
 int 
 main (int argc, char *argv[])
 {
-  Ptr<GeocronExperiment> exp = CreateObject<GeocronExperiment> ();
 
   ////////////////////////////////////////////////////////////////////////////////
   ////////////////////     Arguments    //////////////////////////////////////////
@@ -52,6 +51,9 @@ main (int argc, char *argv[])
   double timeout = 1.0;
 
   CommandLine cmd;
+  //TODO: create after parsing the commands so that default attribute values can be set?
+  Ptr<GeocronExperiment> exp = CreateObject<GeocronExperiment> ();
+
   // file /topology generator parameters
   cmd.AddValue ("file", "File to read network topology, or configuration in the case of topology generators, from", filename);
   cmd.AddValue ("seed", "Random seed used to generate random topologies.  Chosen based on time and pid by default.", exp->seed);
@@ -68,6 +70,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("trace_forwards", "Whether to print traces when a client forwards a packet", trace_forwards);
   cmd.AddValue ("trace_sends", "Whether to print traces when a client sends a packet initially", trace_sends);
   cmd.AddValue ("verbose", "Whether to print verbose log info (1=INFO, 2=LOGIC, 3=FUNCTION)", verbose);
+  cmd.AddValue ("trace_folder", "Folder name where trace outputs are placed", exp->traceFolderName);
 
   // scenario parameters
   cmd.AddValue ("disaster", "Where the disaster(s) (and subsequent failures) is(are) to occur "

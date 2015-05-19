@@ -90,6 +90,8 @@ def parse_args(args):
                         help='''number of times a node will attempt to try another path after a timeout while using the overlay (default=%(default)s)''')
     parser.add_argument('--timeout', default=0.5, type=float,
                         help='''number of seconds a node will wait before timing out a packet and (potentially) trying another path (default=%(default)s)''')
+    parser.add_argument('--traces_name', type=str, default='ron_output',
+                        help='''name of the folder to output the trace files to for these runs (default=%(default)s))''')
 
     # Control simulation repetition
     parser.add_argument('--runs', '-r', nargs='?',default=default_runs, type=int,
@@ -104,9 +106,9 @@ def parse_args(args):
     # Control waf/build
     parser.add_argument('--optimized', '-o', action="store_true",
                         help='''Configure waf in optimized mode before building.''')
-    parser.add_argument('--extra_args',
+    parser.add_argument('--extra_args', nargs='+',
                         help='''Pass additional args to ns-3. NOTE: you
-                        need to put quotes around the arguments or else this
+                        cut the -- off the front of any arguments and they'll be put back later as otherwise
                         program may interpret them as additional arguments!''')
 
     # Control UI
@@ -215,9 +217,11 @@ def makecmds(args):
 
             # first, ns3 typeId system configurations
             cmd += '--ns3::GeocronExperiment::TopologyType=%s ' % args.topology_type
+            #NOTE: below doesn't properly work yet
+            #cmd += '--ns3::GeocronExperiment::TraceFolderName=%s ' % args.traces_name
 
             if args.extra_args:
-                cmd += args.extra_args + ' '
+                cmd += '--' + ' --'.join(args.extra_args) + ' '
 
             # individual parameters
             if args.disasters != default_disasters:
@@ -244,6 +248,9 @@ def makecmds(args):
             cmd += '--npaths=%s ' % npaths
             cmd += "--timeout=%f " % args.timeout
             cmd += '--nservers=%s ' % nservers
+
+            #NOTE: we could replace this with a direct access to TypeId system
+            cmd += '--trace_folder=%s' % args.traces_name
 
             # static args
             if args.topology_type == 'rocketfuel':

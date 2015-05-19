@@ -91,6 +91,9 @@ public:
   uint32_t nruns;
   uint32_t start_run_number;
   std::size_t seed; // for generating topology files
+  // Name of the folder containing trace outputs
+  std::string traceFolderName;
+
 
   /** Builds various indices for choosing different node types of interest.
       Chooses links/nodes that may be failed during disaster simulation.

@@ -41,6 +41,11 @@ GeocronExperiment::GetTypeId ()
                    StringValue ("brite"),
                    MakeStringAccessor (&GeocronExperiment::topologyType),
                    MakeStringChecker ())
+    .AddAttribute ("TraceFolderName",
+                   "Name of the folder that will contain trace outputs.",
+                   StringValue ("ron_output"),
+                   MakeStringAccessor (&GeocronExperiment::traceFolderName),
+                   MakeStringChecker ())
     .AddAttribute ("Random",
             "The random variable for random decisions.",
             StringValue ("ns3::UniformRandomVariable"),
@@ -409,8 +414,9 @@ GeocronExperiment::AutoSetTraceFile ()
 {
   // The trace files should look like:
   // ron_output/topology/disaster_location/fprob/nservers/heuristic/run#.out
+  NS_LOG_UNCOND ("folder is " << traceFolderName);
 
-  boost::filesystem::path newTraceFile ("ron_output");
+  boost::filesystem::path newTraceFile (traceFolderName);
   newTraceFile /= boost::filesystem::path(topologyFile).stem ();
   newTraceFile /= boost::algorithm::replace_all_copy (currLocation, " ", "_");
 
