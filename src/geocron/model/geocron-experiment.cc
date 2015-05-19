@@ -424,9 +424,9 @@ GeocronExperiment::AutoSetTraceFile ()
   std::setprecision (1);
   fprob << currFprob;
   newTraceFile /= fprob.str ();
-  //newTraceFile /= boost::lexical_cast<std::string> (currFprob);
 
   newTraceFile /= boost::lexical_cast<std::string> (currNServers);
+  newTraceFile /= boost::lexical_cast<std::string> (currNPaths);
 
   // extract unique filename from heuristic to summarize parameters, aggregations, etc.
   // Do this by creating an instance of the current heuristic so that
