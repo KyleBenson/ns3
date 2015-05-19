@@ -438,11 +438,11 @@ RonClient::Send (bool viaOverlay)
             << m_peers->GetN () << " possible options to destination " << *serverPeer << "."
             << (shouldSendDirect ? " Still sending one packet directly." : ""));
         //NS_LOG_DEBUG (e.what ());
-        if (!shouldSendDirect)
-        {
-          CancelEvents ();
-          return;
-        }
+        //if (!shouldSendDirect)
+        //{
+        //  CancelEvents ();
+        //  return;
+        //}
       }
     }
 
