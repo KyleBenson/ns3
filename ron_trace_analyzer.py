@@ -341,6 +341,8 @@ class TraceRun:
         if params.run is not None:
             name += ",r=%s" % params.run
         name += "]"
+        name = name.replace("][", ",")
+        name = name.replace("|", ",")
         return name
 
     def getNNodes(self):
@@ -472,6 +474,8 @@ class TraceGroup:
         name = "%s[f=%s,S=%s]" % (params.heuristic,
                                   params.fprob,
                                   params.nservers)
+        name = name.replace("][", ",")
+        name = name.replace("|", ",")
         return name
 
     def __len__(self):
