@@ -201,14 +201,16 @@ class Parameters:
     The parameters used for a simulation run.
     '''
     # NOTE: these indices ignore the actual filename as that gets sliced off!
-    FPROB_INDEX = -3
-    NSERVERS_INDEX = -2
+    FPROB_INDEX = -4
+    NSERVERS_INDEX = -3
+    NPATHS_INDEX = -2
     HEURISTIC_INDEX = -1
 
     def __init__(self):
         self.fprob = 0.0
         self.heuristic = ''
         self.nservers = 0
+        self.npaths = 0
         self.run = None
         #TODO: everything else
 
@@ -231,6 +233,7 @@ class Parameters:
         params.heuristic = parts[Parameters.HEURISTIC_INDEX]
         params.nservers = parts[Parameters.NSERVERS_INDEX]
         params.fprob = float(parts[Parameters.FPROB_INDEX])
+        params.npaths = parts[Parameters.NPATHS_INDEX]
 
         return params
 
@@ -335,9 +338,10 @@ class TraceRun:
                     self.sendTimes[time] = self.sendTimes.get(time,0) + 1
 
     def getNameByParams(self, params):
-        name = "%s[f=%s,S=%s" % (params.heuristic,
+        name = "%s[f=%s,S=%s,k=%s" % (params.heuristic,
                                  params.fprob,
-                                 params.nservers)
+                                 params.nservers,
+                                 params.npaths)
         if params.run is not None:
             name += ",r=%s" % params.run
         name += "]"
@@ -471,9 +475,10 @@ class TraceGroup:
             print folder, "is not a directory!"
 
     def getNameByParams(self, params):
-        name = "%s[f=%s,S=%s]" % (params.heuristic,
-                                  params.fprob,
-                                  params.nservers)
+        name = "%s[f=%s,S=%s,k=%s]" % (params.heuristic,
+                                 params.fprob,
+                                 params.nservers,
+                                 params.npaths)
         name = name.replace("][", ",")
         name = name.replace("|", ",")
         return name
