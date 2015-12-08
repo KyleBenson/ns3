@@ -104,6 +104,8 @@ private:
   /** Sets the next server for the simulation. */
   void SetNextServers ();
 
+  bool ShouldFailNode(Ptr<Node> node, Vector disasterLocation);
+  bool ShouldFailLink(Ptr<Node> node1, Ptr<Node> node2, Vector disasterLocation);
   void ApplyFailureModel ();
   void UnapplyFailureModel ();
   bool IsOverlayNode (Ptr<Node> node);
@@ -140,6 +142,7 @@ private:
 
   // Random variable for determining if links fail during the disaster
   Ptr<UniformRandomVariable> random;
+  Ptr<NormalRandomVariable> gaussianRandom;
 
   // These maps, indexed by disaster location name, hold nodes of interest for the associated disaster region
   std::map<Location, std::map<uint32_t, Ptr <Node> > > disasterNodes; //both random access AND iteration hmmm...

@@ -24,6 +24,10 @@
 #include <unistd.h>
 #include <boost/functional/hash.hpp>
 
+// Enables using a gaussian model for failure probability
+// based on distance from center of disaster
+//#define GAUSSIAN_FAILURE_MODEL
+
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("GeocronExperiment");
@@ -50,6 +54,11 @@ GeocronExperiment::GetTypeId ()
             "The random variable for random decisions.",
             StringValue ("ns3::UniformRandomVariable"),
             MakePointerAccessor (&GeocronExperiment::random),
+            MakePointerChecker<RandomVariableStream> ())
+    .AddAttribute ("GaussianRandom",
+            "The gaussian random variable for random decisions, in particular failure probability.",
+            StringValue ("ns3::NormalRandomVariable"),
+            MakePointerAccessor (&GeocronExperiment::gaussianRandom),
             MakePointerChecker<RandomVariableStream> ())
     .AddAttribute ("NumberServersChoices",
             "Number of servers to index based on their being external to disaster regions."
@@ -729,6 +738,47 @@ GeocronExperiment::IndexNodes () {
     }
 }
 
+/** Determine the probability that the given node will fail due to a disaster at the given location. */
+bool
+GeocronExperiment::ShouldFailNode(Ptr<Node> node, Vector disasterLocation)
+{
+  double distance = CalculateDistance (GetLocation (node), disasterLocation);
+  Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
+  double disasterRadius = regionHelper->GetRegionSize ();
+
+  //NS_LOG_UNCOND ("Distance: " << distance << ", radius: " << disasterRadius);
+
+  // Failure model: get a random value normally distributed with a 0 mean and R/3 stdev,
+  // ensure it's positive since we're dealing with distance, and return true if this value
+  // is greater than the node's distance from the center of the circle.
+  // In this manner, nodes farther away are much less likely to fail.
+  // Note that we ensure 99.7% of the cumulative distribution is within the disaster
+  // circle by setting the standard deviation to be 1/3rd the radius of the circle.
+#ifdef GAUSSIAN_FAILURE_MODEL
+  double randValue = std::abs(gaussianRandom->GetValue(0, std::pow(disasterRadius/3, 2), disasterRadius));
+  // scale this value using the current failure probability so we can tune the number of failures
+  // TODO: fine-tune this better and normalize so that the number failed
+  // is the same between gaussian and uniform
+  randValue *= 2 * currFprob;
+  //NS_LOG_UNCOND ("Rand is: " << randValue);
+  return (randValue > distance);
+#else
+  return (random->GetValue () < currFprob);
+#endif
+}
+
+/** Determine the probability that the given link will fail
+ * due to a disaster at the given location. It takes into
+ * account the fact that this link may pass closer to the
+ * center of a disaster and so should be based on the actual
+ * line representing the link, rather than just the endpoints.
+ * NOTE: currently it simply returns the logical or of the two nodes' call. */
+bool
+GeocronExperiment::ShouldFailLink(Ptr<Node> node1, Ptr<Node> node2, Vector disasterLocation)
+{
+  return ShouldFailNode(node1, disasterLocation) or ShouldFailNode(node2, disasterLocation);
+}
+
 /**   Fail the links that were chosen with given probability */
 void
 GeocronExperiment::ApplyFailureModel () {
@@ -745,12 +795,12 @@ GeocronExperiment::ApplyFailureModel () {
 
       //TODO: set this based on disaster location
       //Vector disasterLocation = Vector (100, 100, 0);
-      //Vector disasterLocation = GetRegionHelper ()->GetLocation (currLocation);
+      Vector disasterLocation = GetRegionHelper ()->GetLocation (currLocation);
       //double distance = CalculateDistance (GetLocation (node), disasterLocation);
       //double distanceFactor = std::pow (distance, -0.64);
 
       // Fail nodes within the disaster region with some probability
-      if (random->GetValue () < currFprob)
+      if (ShouldFailNode(node, disasterLocation))
         {
           failNodes.Add (node);
           NS_LOG_LOGIC ("Node " << (node)->GetId () << " failed.");
@@ -765,14 +815,16 @@ GeocronExperiment::ApplyFailureModel () {
 
         for (uint32_t i = 1; i <= GetNodeDegree(node); i++)
           {
-            if (random->GetValue () < currFprob)
+            // get the necessary info for the other end of the link
+            Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (node->GetDevice (i));
+
+            if (ShouldFailLink(node, otherNetDevice->GetNode (), disasterLocation))
               {
                 // fail both this end of the link and the other side!
                 ifacesToKill.Add(ipv4, i);
                 FailIpv4 (ipv4, i);
 
                 // get the necessary info for the other end of the link
-                Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (node->GetDevice (i));
                 Ptr<Ipv4> otherIpv4 = otherNetDevice->GetNode ()->GetObject<Ipv4> ();
                 uint32_t otherIndex = otherIpv4->GetInterfaceForDevice (otherNetDevice);
 
