@@ -148,11 +148,12 @@ def parse_args(args):
             args.heuristics = args.heuristics[:1]
         #args.topologies = args.topologies[:1]
         if args.topologies == default_file:
-            args.topologies = ['src/brite/examples/conf_files/RTWaxman20.conf']
+            #args.topologies = ['src/brite/examples/conf_files/RTWaxman20.conf']
+            args.topologies = ['src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf']
             #args.topologies = ['3356'] #small topology in US
             #TODO: something for rocketfuel once we feed that in to the GeocronExperiment
             if args.disasters == default_disasters:
-                args.disasters = ['2,2'] #25 nodes
+                args.disasters = ['0,0'] #25 nodes
         if args.fprobs is default_fprobs:
             args.fprobs = [str(0.5)]
 
