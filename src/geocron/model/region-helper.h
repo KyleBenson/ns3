@@ -26,6 +26,9 @@
 #include <boost/lexical_cast.hpp>
 #include <map>
 
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+
 namespace ns3 {
 
   //NS_LOG_COMPONENT_DEFINE ("RegionHelper");
@@ -132,6 +135,22 @@ public:
     reg = boost::lexical_cast<std::string> (responsibleX) + "," + boost::lexical_cast<std::string> (responsibleY);
 
     return reg;
+  }
+
+  // Define new version here so we can compute the disaster location
+  // directly from the region its specified in
+  virtual Vector GetLocation (Location reg) {
+    // Split the location into actual ints
+    std::vector<std::string> locationParts;
+    boost::algorithm::split (locationParts, reg,
+        boost::algorithm::is_any_of (","));
+    Vector gridCell (boost::lexical_cast<int> (locationParts[0]),
+          boost::lexical_cast<int> (locationParts[0]), 0);
+
+    // Now convert grid cell location into actual geographic location
+    // of the cell's center.
+    return Vector ((gridCell.x + 0.5) * GetRegionSize (),
+           (gridCell.y + 0.5) * GetRegionSize (), 0);
   }
 
   double GetRegionSize ()
