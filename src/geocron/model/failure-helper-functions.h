@@ -20,6 +20,7 @@ namespace ns3 {
   Ptr<Node> GetNodeByIp (Ipv4Address dest);
 
   std::string GetNodeType (Ptr<Node> node);
+  std::string GetNodeName (Ptr<Node> node);
   bool IsSeismicSensor (Ptr<Node> node);
   bool IsWaterSensor (Ptr<Node> node);
   bool IsBasestation (Ptr<Node> node);

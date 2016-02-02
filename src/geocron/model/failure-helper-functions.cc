@@ -116,6 +116,21 @@ Ptr<Node> GetNodeByIp (Ipv4Address dest)
 
 std::string GetNodeType (Ptr<Node> node)
 {
+  // First, get the name without any of the hierarchy
+  std::string nodeName = GetNodeName (node);
+
+  // Next we trim off all the numbers (the name/node id)
+  std::vector<std::string> nameParts;
+  boost::algorithm::split (nameParts, nodeName,
+      boost::algorithm::is_any_of ("0123456789"));
+  std::string result = nameParts[0];
+
+  //NS_LOG_UNCOND ("Type for node " << nodeName << " is " << result);
+  return result;
+}
+
+std::string GetNodeName (Ptr<Node> node)
+{
   std::string nodeName = Names::FindPath (node);
   // Split off just the part of the name that represents the node category.
   // We do this by first trimming off everything before the '/'
@@ -123,13 +138,6 @@ std::string GetNodeType (Ptr<Node> node)
   boost::algorithm::split (nameParts, nodeName,
       boost::algorithm::is_any_of ("/"));
   std::string result = nameParts[2];
-
-  // Next we trim off all the numbers (the name/node id)
-  boost::algorithm::split (nameParts, result,
-      boost::algorithm::is_any_of ("0123456789"));
-  result = nameParts[0];
-
-  NS_LOG_UNCOND ("Type for node " << nodeName << " is " << result);
   return result;
 }
 
