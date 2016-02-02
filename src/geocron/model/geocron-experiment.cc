@@ -26,11 +26,15 @@
 
 // Enables using a gaussian model for failure probability
 // based on distance from center of disaster
-//#define GAUSSIAN_FAILURE_MODEL
+#define GAUSSIAN_FAILURE_MODEL
 
 // Sets peer tables for each client to be the table of all overlay peers.
 // Disabling chooses a random subset of the peers totalling c*log(n).
 #define USE_FULL_PEER_TABLE
+
+// If enabled, only nodes in the disaster region will report disasters
+// and potentially fail
+//#define DISASTER_NODES_ONLY_IN_REGION
 
 using namespace ns3;
 
@@ -690,17 +694,18 @@ GeocronExperiment::IndexNodes () {
       (*node)->AggregateObject (thisPeer);
 
       // Build disaster node indexes
-      // If the node is in a disaster region, add it to the corresponding list
-
+      // If the node is in a disaster region and the simulator is
+      // configured for only those nodes to be active in the
+      // disaster model, add it to the corresponding list
       for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
            // Only bother if the region is defined
            disasterLocation != disasterLocations->end () and nodeRegion != NULL_REGION;
            disasterLocation++)
         {
+#ifdef DISASTER_NODES_ONLY_IN_REGION
           if (nodeRegion == *disasterLocation)
-            {
+#endif
               disasterNodes[*disasterLocation].insert(std::pair<uint32_t, Ptr<Node> > ((*node)->GetId (), *node));
-            }
 
           // Used for debugging to make sure locations are being found properly
 #ifdef NS3_LOG_ENABLE
@@ -713,9 +718,9 @@ GeocronExperiment::IndexNodes () {
 
       // OVERLAY NODES
       //
-      // We may only install the overlay application on clients attached to stub networks,
-      // so we just choose the stub network nodes here
-      // (note that all nodes have a loopback device)
+      // We may only install the overlay application on certain clients.
+      // These may be explicitly defined (GeocronInet topology model) or
+      // they may be determined by checking if they are attached to stub networks,
       if (IsOverlayNode (*node))
         {
           overlayNodes.Add (*node);
@@ -820,8 +825,18 @@ GeocronExperiment::IndexNodes () {
 bool
 GeocronExperiment::ShouldFailNode(Ptr<Node> node, Vector disasterLocation)
 {
-  Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
-
+  // Failure model: Gaussian-like model chooses failure probability of
+  // a node as fprob/2^(D*S/B) where:
+  // fprob = base failure probability
+  // S = split factor of region (SxS grid cells)
+  // B = boundary length of whole region
+  // This was derived from an approximation model where each cell away
+  // from the disaster location halved the fprob.  This is the continuous,
+  // rather than step-wise, version of that.
+  //
+  // TODO: implement actual Gaussian model below that normalizes the
+  // probabilities based on the size of the disaster (region size)
+  //
   // Failure model: get a random value normally distributed with a 0 mean and R/3 stdev,
   // ensure it's positive since we're dealing with distance, and return true if this value
   // is greater than the node's distance from the center of the circle.
@@ -829,29 +844,44 @@ GeocronExperiment::ShouldFailNode(Ptr<Node> node, Vector disasterLocation)
   // Note that we ensure 99.7% of the cumulative distribution is within the disaster
   // circle by setting the standard deviation to be 1/3rd the radius of the circle.
 #ifdef GAUSSIAN_FAILURE_MODEL
+  Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
+
   double distance = CalculateDistance (GetLocation (node), disasterLocation);
+
+  // This is equal to B/S
   double disasterRadius = regionHelper->GetRegionSize ();
+  double thisFprob = currFprob / std::pow (2, distance / disasterRadius);
+
+  NS_LOG_UNCOND ("Fprob for Node " << GetNodeName (node) <<
+      " at distance " << distance << " from disaster at " <<
+      disasterLocation << " is " << thisFprob);
+
+  return (random->GetValue () < thisFprob);
 
   //NS_LOG_UNCOND ("Distance: " << distance << ", radius: " << disasterRadius);
 
-  double randValue = std::abs(gaussianRandom->GetValue(0, std::pow(disasterRadius/3, 2), disasterRadius));
+  //double randValue = std::abs(gaussianRandom->GetValue(0, std::pow(disasterRadius/3, 2), disasterRadius));
   // scale this value using the current failure probability so we can tune the number of failures
   // TODO: fine-tune this better and normalize so that the number failed
   // is the same between gaussian and uniform
-  randValue *= 2 * currFprob;
+  //randValue *= 2 * currFprob;
   //NS_LOG_UNCOND ("Rand is: " << randValue);
-  return (randValue > distance);
+  //return (randValue > distance);
 #else
   return (random->GetValue () < currFprob);
 #endif
 }
 
-/** Determine the probability that the given link will fail
- * due to a disaster at the given location. It takes into
+/** Determine the probability that the given WIRED link will fail
+ * due to a disaster at the given location.
+ * NOTE: currently it simply returns the logical or of
+ * the two nodes' call to ShouldFail.
+ *
+ * TODO: It takes into
  * account the fact that this link may pass closer to the
  * center of a disaster and so should be based on the actual
  * line representing the link, rather than just the endpoints.
- * NOTE: currently it simply returns the logical or of the two nodes' call. */
+ */
 bool
 GeocronExperiment::ShouldFailLink(Ptr<Node> node1, Ptr<Node> node2, Vector disasterLocation)
 {
@@ -867,26 +897,24 @@ GeocronExperiment::ApplyFailureModel () {
   failNodes = NodeContainer ();
   ifacesToKill = Ipv4InterfaceContainer ();
 
+  Vector disasterLocation = GetRegionHelper ()->GetLocation (currLocation);
+
   for (std::map<uint32_t, Ptr <Node> >::iterator nodeItr = disasterNodes[currLocation].begin ();
        nodeItr != disasterNodes[currLocation].end (); nodeItr++)
     {
       Ptr<Node> node = nodeItr->second;
 
-      //TODO: set this based on disaster location
-      //Vector disasterLocation = Vector (100, 100, 0);
-      Vector disasterLocation = GetRegionHelper ()->GetLocation (currLocation);
-      //double distance = CalculateDistance (GetLocation (node), disasterLocation);
-      //double distanceFactor = std::pow (distance, -0.64);
-
       // Fail nodes within the disaster region with some probability
-      if (ShouldFailNode(node, disasterLocation))
+      // NOTE: we never fail the server as it is assumed to be far away
+      // from the disaster region.
+      if (!IsServer (node) and ShouldFailNode(node, disasterLocation))
         {
           failNodes.Add (node);
-          NS_LOG_LOGIC ("Node " << (node)->GetId () << " failed.");
+          NS_LOG_LOGIC ("Node " << GetNodeName (node) << " failed.");
           FailNode (node);
         }
 
-      else {
+      else if (!IsServer (node)) {
         // Check all links on this node if it wasn't failed (which would fail all links anyway)
         // NOTE: iface 0 is the loopback
         Ptr<Ipv4> ipv4 = node->GetObject<Ipv4> ();
@@ -894,10 +922,21 @@ GeocronExperiment::ApplyFailureModel () {
 
         for (uint32_t i = 1; i <= GetNodeDegree(node); i++)
           {
-            // get the necessary info for the other end of the link
-            Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (node->GetDevice (i));
+            Ptr<NetDevice> thisNetDevice = node->GetDevice (i);
 
-            if (ShouldFailLink(node, otherNetDevice->GetNode (), disasterLocation))
+            // We don't fail wireless links, which exist between the
+            // water sensors and basestations as well as between basestations.
+            // NOTE: this check needs to come before we try to get the
+            // other node as our method of doing so assumes p2p links.
+            if (IsWaterSensor (node) or
+                (IsBasestation (node) and !thisNetDevice->IsPointToPoint ()))
+              continue;
+
+            // get the necessary info for the other end of the link
+            Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (thisNetDevice);
+            Ptr<Node> otherNode = otherNetDevice->GetNode ();
+
+            if (ShouldFailLink(node, otherNode, disasterLocation))
               {
                 // fail both this end of the link and the other side!
                 ifacesToKill.Add(ipv4, i);
