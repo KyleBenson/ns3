@@ -224,7 +224,8 @@ main (int argc, char *argv[])
   exp->ReadRocketfuelTopology (filename);
   */
 
-  exp->ReadBriteTopology (filename);
+  //exp->ReadBriteTopology (filename);
+  exp->ReadGeocronInetTopology (filename);
 
   exp->IndexNodes ();
   //exp->SetTraceFile (traceFile);

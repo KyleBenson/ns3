@@ -13,7 +13,8 @@ from os import system
 default_runs=20
 default_start=0 # num to start run IDs on
 default_nprocs=8
-default_file=['src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf',
+default_file=['src/topology-read/examples/small-geocron-network.txt',
+              #'src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf',
               #'3356', #level3
               #'1239', #sprintlink
               #'2914', #verio
@@ -65,9 +66,9 @@ def parse_args(args):
                                      )
     # Topology generation/loading parameters
     parser.add_argument('--topology_file', '--file', '--as', nargs='+', default=default_file, dest='topologies',
-                        help='''choose the rocketfuel AS topologies or BRITE configuration files for the simulations (default=%(default)s)''')
-    parser.add_argument('--topology_type', '--topo', default="brite",
-                        help='''choose how to read/generate topology (rocketfuel or brite, default=%(default)s)''')
+                        help='''choose the GeocronInet topology, rocketfuel AS topologies, or BRITE configuration files for the simulations (default=%(default)s)''')
+    parser.add_argument('--topology_type', '--topo', default="inet",
+                        help='''choose how to read/generate topology (inet[geocron version], rocketfuel, or brite, default=%(default)s)''')
     parser.add_argument('--seed', default=0, type=int,
                         help='''Random seed for generating topologies with brite, default is to let the GeocronExperiment choose it itself,
                         which will result in using a combination of the time and pid, hence giving a unique seed to each process.  Using this
@@ -75,7 +76,9 @@ def parse_args(args):
 
     # GeoCRON Simulation parameters
     parser.add_argument('--disasters', type=str, nargs='*', default=default_disasters,
-                        help='''disaster locations to apply to ALL AS choices (cities currently) (default depends on AS)''')
+                        help='''Different meanings depending on topology type. Rocketfuel:
+                        disaster locations to apply to ALL AS choices (cities currently) (default depends on AS);
+                        BRITE / Inet: region in a 5x5 grid, e.g. 1,1 ''')
     parser.add_argument('--fprobs', '-f', type=str, nargs='*',
                         default=default_fprobs,
                         help='''failure probabilities to use (default=%(default)s)''')
@@ -148,12 +151,13 @@ def parse_args(args):
             args.heuristics = args.heuristics[:1]
         #args.topologies = args.topologies[:1]
         if args.topologies == default_file:
+            args.topologies = ['src/topology-read/examples/small-geocron-network.txt']
             #args.topologies = ['src/brite/examples/conf_files/RTWaxman20.conf']
-            args.topologies = ['src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf']
+            #args.topologies = ['src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf']
             #args.topologies = ['3356'] #small topology in US
             #TODO: something for rocketfuel once we feed that in to the GeocronExperiment
             if args.disasters == default_disasters:
-                args.disasters = ['0,0'] #25 nodes
+                args.disasters = ['0,2']
         if args.fprobs is default_fprobs:
             args.fprobs = [str(0.5)]
 
@@ -236,8 +240,10 @@ def makecmds(args):
                 cmd += '--file=rocketfuel/maps/%s.cch ' % topology
             elif args.topology_type == 'brite':
                 cmd += '--file=%s ' % topology
+            elif args.topology_type == 'inet':
+                cmd += '--file=%s ' % topology
             else:
-                print("Unrecognized topology generator type %s, exiting..." % topology_type)
+                print("Unrecognized topology generator type %s, exiting..." % args.topology_type)
                 system.exit()
 
             cmd += '--fail_prob=%s ' % fprobs

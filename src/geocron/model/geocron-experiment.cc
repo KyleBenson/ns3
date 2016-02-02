@@ -28,6 +28,10 @@
 // based on distance from center of disaster
 //#define GAUSSIAN_FAILURE_MODEL
 
+// Sets peer tables for each client to be the table of all overlay peers.
+// Disabling chooses a random subset of the peers totalling c*log(n).
+#define USE_FULL_PEER_TABLE
+
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("GeocronExperiment");
@@ -41,8 +45,7 @@ GeocronExperiment::GetTypeId ()
     .AddConstructor<GeocronExperiment> ()
     .AddAttribute ("TopologyType",
                    "Name of the topology generator to be used by this experiment.  Supports: rocketfuel, brite.",
-                   //StringValue ("rocketfuel"),
-                   StringValue ("brite"),
+                   StringValue ("inet"),
                    MakeStringAccessor (&GeocronExperiment::topologyType),
                    MakeStringChecker ())
     .AddAttribute ("TraceFolderName",
@@ -83,7 +86,7 @@ GeocronExperiment::GeocronExperiment ()
   overlayPeers = Create<RonPeerTable> ();
   allPeers = RonPeerTable::GetMaster ();
 
-  maxNDevs = 5;
+  maxNDevs = 2;
   //cmd.AddValue ("install_stubs", "If not 0, install RON client only on stub nodes (have <= specified links - 1 (for loopback dev))", maxNDevs);
 
   //these defaults should all be overwritten by the command line parser
@@ -113,6 +116,10 @@ Ptr<RegionHelper> GeocronExperiment::GetRegionHelper ()
       else if (topologyType == "brite") {
         regionHelper = CreateObject<BriteRegionHelper> ();
       }
+      // BriteRegionHelper just divides into a grid for regions
+      else if (topologyType == "inet") {
+        regionHelper = CreateObject<BriteRegionHelper> ();
+      }
       else {
         NS_ASSERT_MSG(false, "Invalid topology type: " << topologyType);
       }
@@ -128,28 +135,6 @@ GeocronExperiment::SetTimeout (Time newTimeout)
 }
 
 
-void
-GeocronExperiment::NextHeuristic ()
-{
-  //heuristicIdx++;
-}
-
-void
-GeocronExperiment::NextDisasterLocation ()
-{
-  return;
-  //locationIdx++;
-}
-
-
-void
-GeocronExperiment::NextFailureProbability ()
-{
-  return;
-  //fpropIdx++;
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////
 ///////////////////   File/Topology Helper Functions     ///////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -158,6 +143,7 @@ GeocronExperiment::NextFailureProbability ()
 bool
 GeocronExperiment::IsDisasterNode (Ptr<Node> node)
 {
+  //TODO: fix this?
   return disasterNodes[currLocation].count ((node)->GetId ());
 }
 
@@ -165,8 +151,86 @@ GeocronExperiment::IsDisasterNode (Ptr<Node> node)
 bool
 GeocronExperiment::IsOverlayNode (Ptr<Node> node)
 {
+  // This was for randomly choosing nodes to be in the overlay when using
+  // topologies like BRITE, Rocketfuel.  Now, we explicitly place nodes of
+  // different types in the topology and so can directly check this...
+  //
   // first part handles if we didn't specify a max degree for overlay nodes, in which case ALL nodes are overlays...
-  return !maxNDevs or GetNodeDegree (node) <= maxNDevs;
+  //return !maxNDevs or GetNodeDegree (node) <= maxNDevs;
+  return IsSeismicSensor (node);// or IsBasestation (node);
+}
+
+
+/////////////////////////////////////////////////////////////////////
+////////////////////    Geocron (Inet-based) Topology ///////////////
+/////////////////////////////////////////////////////////////////////
+
+
+void GeocronExperiment::ReadGeocronInetTopology (std::string topologyFile)
+{
+  GeocronInetTopologyReader topo;
+  topo.SetFileName (topologyFile);
+  nodes = topo.Read ();
+
+  // need a list routing setup
+  Ipv4NixVectorHelper nixRouting;
+  nixRouting.SetAttribute("FollowDownEdges", BooleanValue (true));
+  Ipv4StaticRoutingHelper staticRouting;
+  Ipv4ListRoutingHelper routingList;
+  routingList.Add (staticRouting, 0);
+  routingList.Add (nixRouting, 10);
+
+  // setup network stack and install it on all nodes
+  InternetStackHelper stack;
+  stack.SetRoutingHelper (routingList); // has effect on the next Install ()
+  stack.Install (nodes);
+
+  // create physical links and setup networking on them
+  PointToPointHelper p2p;
+  Ipv4AddressHelper address;
+  address.SetBase ("10.1.0.0", "255.255.255.252");
+  TopologyReader::ConstLinksIterator iter;
+  for ( iter = topo.LinksBegin (); iter != topo.LinksEnd (); iter++)
+  {
+    NodeContainer theseNodes (iter->GetFromNode (), iter->GetToNode ());
+    //TODO: set delay based on distance, datarate based on "weight"
+    //TODO: account for different types of links between different node types
+    // p2p.SetChannelAttribute ("Delay", TimeValue(MilliSeconds(weight[i])));
+    p2p.SetChannelAttribute ("Delay", StringValue ("2ms"));
+    p2p.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+    NetDeviceContainer devs = p2p.Install (theseNodes);
+    address.Assign (devs);
+    address.NewNetwork ();
+
+    //NS_LOG_LOGIC ("Link from " << fromLocation << "[" << fromPosition << "] to " << toLocation<< "[" << toPosition << "]");
+  }
+
+  // Lastly, set the topology boundary for the RegionHelper
+  //
+  //TODO: make these part of the object so we can change it
+  //OR we could just determine it by the max/min x/y coordinates?
+  double boundaryLength = 50;
+
+  Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
+  NS_ASSERT_MSG (regionHelper, "Need BriteRegionHelper for ReadGeocronInetTopology!");
+
+  regionHelper->SetTopologySize (boundaryLength);
+
+  // HACK: the simulator was set up when using BRITE to pick a set of candidate servers
+  // outside each disaster region according to high node degrees.  With this topology,
+  // we explicitly placed a server node so to keep the previous functionality intact
+  // we simply add each of the server nodes to the candidate list for each region.
+  //
+  for (NodeContainer::Iterator serverCandidate = topo.servers.Begin ();
+      serverCandidate != topo.servers.End (); serverCandidate++)
+  {
+    for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
+        disasterLocation != disasterLocations->end (); disasterLocation++)
+    {
+      serverNodeCandidates[*disasterLocation].Add (*serverCandidate);
+    }
+  }
+
 }
 
 
@@ -193,7 +257,7 @@ void GeocronExperiment::ReadBriteTopology (std::string topologyFile)
     boost::hash_combine (seed, getpid());
   }
   bth.AssignStreams (seed);
-  
+
   // the topologyFile attribute is used to determine the name of the directory hierarchy
   // the trace outputs will be saved to
   this->topologyFile = boost::lexical_cast<std::string> (seed);
@@ -450,7 +514,7 @@ GeocronExperiment::AutoSetTraceFile ()
   uint32_t outnum = currRun;
   if (start_run_number)
     outnum = currRun + start_run_number;
-  
+
   std::string fname = "run";
   fname += boost::lexical_cast<std::string> (outnum);
   newTraceFile /= (fname);
@@ -566,7 +630,18 @@ GeocronExperiment::ConnectAppTraces ()
 
 void
 GeocronExperiment::IndexNodes () {
+  // This function iterates over all the nodes and builds various
+  // structures that let us choose the following types of nodes:
+  // servers, disaster nodes, and all overlay nodes.
+  // It also adds RonPeerEntry's to Nodes, sets region information,
+  // and installs RonClientApplications, all of which is crucial.
+  //
+  // NOTE: some of this only needs to be done when using certain
+  // topologies (e.g. BRITE) as the new GeocronInet topology style
+  // explicitly categorizes each node type in the input file.
+  //
   NS_LOG_INFO ("Topology finished.  Choosing & installing clients.");
+  bool choosingServers = topologyType != "inet";
 
   // We want to narrow down the number of server choices by picking about nServerChoices of the highest-degree
   // nodes.  We want at least nServerChoices of them, but will allow more so as not to include some of degree d
@@ -626,7 +701,7 @@ GeocronExperiment::IndexNodes () {
             {
               disasterNodes[*disasterLocation].insert(std::pair<uint32_t, Ptr<Node> > ((*node)->GetId (), *node));
             }
- 
+
           // Used for debugging to make sure locations are being found properly
 #ifdef NS3_LOG_ENABLE
           if (!HasLocation (*node))
@@ -635,22 +710,22 @@ GeocronExperiment::IndexNodes () {
             }
 #endif
         } // end disaster location iteration
-      
+
       // OVERLAY NODES
       //
       // We may only install the overlay application on clients attached to stub networks,
       // so we just choose the stub network nodes here
       // (note that all nodes have a loopback device)
-      if (IsOverlayNode (*node)) 
+      if (IsOverlayNode (*node))
         {
           overlayNodes.Add (*node);
           Ptr<RonPeerEntry> newEntry = overlayPeers->AddPeer (*node);
           allPeers->AddPeer (newEntry);
         }
 
-      // ROUTING NODES
+      // ROUTING NODES (choose servers)
       // must ignore if no location information, since clients expect server location info!
-      else if (!IsOverlayNode (*node) and HasLocation (*node))
+      else if (choosingServers and !IsOverlayNode (*node) and HasLocation (*node))
         {
           //add potential server
           if (degree >= lowDegree or potentialServerNodeCandidates.size () < nServerChoices)
@@ -719,9 +794,11 @@ GeocronExperiment::IndexNodes () {
   clientApps.Stop (appStopTime);
 
   // Now cache the actual choices of server nodes for each disaster region
-  NS_LOG_DEBUG (potentialServerNodeCandidates.size () << " total potentialServerNodeCandidates.");
-  for (DegreePriorityQueue::iterator itr = potentialServerNodeCandidates.begin ();
-       itr != potentialServerNodeCandidates.end (); itr++)
+  if (choosingServers)
+  {
+    NS_LOG_DEBUG (potentialServerNodeCandidates.size () << " total potentialServerNodeCandidates.");
+    for (DegreePriorityQueue::iterator itr = potentialServerNodeCandidates.begin ();
+        itr != potentialServerNodeCandidates.end (); itr++)
     {
       NS_LOG_DEBUG ("Node " << itr->second->GetId () << " has degree " << GetNodeDegree (itr->second));
       Ptr<Node> serverCandidate = itr->second;
@@ -730,23 +807,20 @@ GeocronExperiment::IndexNodes () {
       Location loc = candidatePeer->region;
 
       for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
-           disasterLocation != disasterLocations->end (); disasterLocation++)
-        {
-          if (*disasterLocation != loc)
-            serverNodeCandidates[*disasterLocation].Add (serverCandidate);
-        }
+          disasterLocation != disasterLocations->end (); disasterLocation++)
+      {
+        if (*disasterLocation != loc)
+          serverNodeCandidates[*disasterLocation].Add (serverCandidate);
+      }
     }
+  }
 }
 
 /** Determine the probability that the given node will fail due to a disaster at the given location. */
 bool
 GeocronExperiment::ShouldFailNode(Ptr<Node> node, Vector disasterLocation)
 {
-  double distance = CalculateDistance (GetLocation (node), disasterLocation);
   Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
-  double disasterRadius = regionHelper->GetRegionSize ();
-
-  //NS_LOG_UNCOND ("Distance: " << distance << ", radius: " << disasterRadius);
 
   // Failure model: get a random value normally distributed with a 0 mean and R/3 stdev,
   // ensure it's positive since we're dealing with distance, and return true if this value
@@ -755,6 +829,11 @@ GeocronExperiment::ShouldFailNode(Ptr<Node> node, Vector disasterLocation)
   // Note that we ensure 99.7% of the cumulative distribution is within the disaster
   // circle by setting the standard deviation to be 1/3rd the radius of the circle.
 #ifdef GAUSSIAN_FAILURE_MODEL
+  double distance = CalculateDistance (GetLocation (node), disasterLocation);
+  double disasterRadius = regionHelper->GetRegionSize ();
+
+  //NS_LOG_UNCOND ("Distance: " << distance << ", radius: " << disasterRadius);
+
   double randValue = std::abs(gaussianRandom->GetValue(0, std::pow(disasterRadius/3, 2), disasterRadius));
   // scale this value using the current failure probability so we can tune the number of failures
   // TODO: fine-tune this better and normalize so that the number failed
@@ -962,6 +1041,9 @@ GeocronExperiment::SetNextServers () {
 Ptr<RonPeerTable>
 GeocronExperiment::GetPeerTableForPeer (Ptr<RonPeerEntry> peer)
 {
+#ifdef USE_FULL_PEER_TABLE
+  return overlayPeers;
+#else
   // We want to return the same peer table for a given peer so that each
   // heuristic will have an identical table.  We regenerate the tables
   // each time we are back to the first number of servers as that indicates
@@ -995,6 +1077,7 @@ GeocronExperiment::GetPeerTableForPeer (Ptr<RonPeerEntry> peer)
     return newTable;
   }
   return cachedPeerTables[peer->id];
+#endif
 }
 
 

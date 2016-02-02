@@ -1,4 +1,6 @@
 #include "failure-helper-functions.h"
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 #ifndef nslog
 #define nslog(x) NS_LOG_UNCOND(x);
@@ -7,6 +9,10 @@
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("FailureHelperFunctions");
+
+////////////////////////////////////////////////////////////////////////
+////////////   Actual failure-related functions     ////////////////////
+////////////////////////////////////////////////////////////////////////
 
 // Fail links by turning off the net devices at each end
 void FailIpv4 (Ptr<Ipv4> ipv4, uint32_t iface)
@@ -53,8 +59,15 @@ void UnfailNode (Ptr<Node> node, Time appStopTime)
     }
 }
 
+
+////////////////////////////////////////////////////////////////////////
+////////////   Node helper functions     ///////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+
 Ipv4Address GetNodeAddress(Ptr<Node> node)
 {
+  NS_ASSERT_MSG (node->GetNDevices() > 1, "Node " << Names::FindName (node) << " only has a loopback device, cannot get its Address!");
   return ((Ipv4Address)(node->GetObject<Ipv4>()->GetAddress(1,0).GetLocal()));
   // for interfaces: //ronServer.Install (router_interfaces.Get (0).first->GetNetDevice (0)->GetNode ());
 }
@@ -95,6 +108,55 @@ Ptr<Node> GetNodeByIp (Ipv4Address dest)
     }
 
   return destNode;
+}
+
+////////////////////////////////////////////////////////////////////////
+////////////   Geocron Node type helper functions     //////////////////
+////////////////////////////////////////////////////////////////////////
+
+std::string GetNodeType (Ptr<Node> node)
+{
+  std::string nodeName = Names::FindPath (node);
+  // Split off just the part of the name that represents the node category.
+  // We do this by first trimming off everything before the '/'
+  std::vector<std::string> nameParts;
+  boost::algorithm::split (nameParts, nodeName,
+      boost::algorithm::is_any_of ("/"));
+  std::string result = nameParts[2];
+
+  // Next we trim off all the numbers (the name/node id)
+  boost::algorithm::split (nameParts, result,
+      boost::algorithm::is_any_of ("0123456789"));
+  result = nameParts[0];
+
+  NS_LOG_UNCOND ("Type for node " << nodeName << " is " << result);
+  return result;
+}
+
+bool IsSeismicSensor (Ptr<Node> node)
+{
+  return GetNodeType (node) == "seismicSensor";
+}
+
+bool IsWaterSensor (Ptr<Node> node)
+{
+  return GetNodeType (node) == "waterSensor";
+}
+
+bool IsBasestation (Ptr<Node> node)
+{
+  return GetNodeType (node) == "basestation";
+}
+
+bool IsServer (Ptr<Node> node)
+{
+  return GetNodeType (node) == "server";
+}
+
+bool IsRouter (Ptr<Node> node)
+{
+  std::string nodeType = GetNodeType (node);
+  return nodeType == "gatewayRouter" or nodeType == "backboneRouter";
 }
 
 }//namespace

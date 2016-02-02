@@ -54,6 +54,7 @@ public:
   // functions dealing with topology generators
   void SetTopologyType (std::string topoType);
 
+  void ReadGeocronInetTopology (std::string topologyFile);
   void ReadBriteTopology (std::string topologyFile);
 
   // next, Rocketfuel
@@ -72,10 +73,6 @@ public:
   
   void SetDisasterLocation (Location newDisasterLocation);
   void SetFailureProbability (double newFailureProbability);
-  //void SetHeuristic (newHeuristic);
-  void NextHeuristic ();
-  void NextDisasterLocation ();
-  void NextFailureProbability ();
   Ptr<RonPeerTable> GetPeerTableForPeer (Ptr<RonPeerEntry> peer);
 
   std::vector<ObjectFactory*> * heuristics;

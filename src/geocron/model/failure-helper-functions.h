@@ -18,6 +18,14 @@ namespace ns3 {
   uint32_t GetNodeDegree(Ptr<Node> node);
   Ptr<NetDevice> GetOtherNetDevice (Ptr<NetDevice> thisDev);
   Ptr<Node> GetNodeByIp (Ipv4Address dest);
+
+  std::string GetNodeType (Ptr<Node> node);
+  bool IsSeismicSensor (Ptr<Node> node);
+  bool IsWaterSensor (Ptr<Node> node);
+  bool IsBasestation (Ptr<Node> node);
+  bool IsServer (Ptr<Node> node);
+  bool IsRouter (Ptr<Node> node);
+
 } //namespace ns3
 
 
