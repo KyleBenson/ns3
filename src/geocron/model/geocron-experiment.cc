@@ -198,11 +198,19 @@ void GeocronExperiment::ReadGeocronInetTopology (std::string topologyFile)
   for ( iter = topo.LinksBegin (); iter != topo.LinksEnd (); iter++)
   {
     NodeContainer theseNodes (iter->GetFromNode (), iter->GetToNode ());
-    //TODO: set delay based on distance, datarate based on "weight"
-    //TODO: account for different types of links between different node types
-    // p2p.SetChannelAttribute ("Delay", TimeValue(MilliSeconds(weight[i])));
+    // TODO: set delay based on distance? this is tricky as it is really
+    // the speed of light, which results in essentially negligible delays
+    // (sub ms) for any distance under 200km
+    // TODO: account for different types of links (e.g. p2p vs. UNB vs. WIMAX)
+    // between different node types
     p2p.SetChannelAttribute ("Delay", StringValue ("2ms"));
-    p2p.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
+    // Below was used in Rocketfuel files, which have associated latency files, I think...
+    // p2p.SetChannelAttribute ("Delay", TimeValue(MilliSeconds(weight[i])));
+    // Set link bandwidth based on the "weight" parameter included in
+    // Inet topology, which is assumed to be in Mbps
+    std::string bw = "100";
+    iter->GetAttributeFailSafe (std::string ("Weight"), bw);
+    p2p.SetDeviceAttribute ("DataRate", StringValue (bw + "Mbps"));
     NetDeviceContainer devs = p2p.Install (theseNodes);
     address.Assign (devs);
     address.NewNetwork ();
@@ -566,7 +574,13 @@ GeocronExperiment::RunAllScenarios ()
             {
               // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
               // to each other for each configuration of failures
+              //
               ApplyFailureModel ();
+              //
+              // TODO: if we go back to randomly picking servers,
+              // shouldn't we ensure that some portion of the same
+              // servers are chosen between runs so the randomness
+              // isn't due so much to the server choices?
               for (uint32_t s = 0; s < nservers->size (); s++)
               {
                 currNServers = nservers->at (s);
@@ -925,7 +939,7 @@ GeocronExperiment::ApplyFailureModel () {
           {
             Ptr<NetDevice> thisNetDevice = node->GetDevice (i);
 
-            // We don't fail wireless links, which exist between the
+            // HACK: We don't fail wireless links, which exist between the
             // water sensors and basestations as well as between basestations.
             // NOTE: this check needs to come before we try to get the
             // other node as our method of doing so assumes p2p links.
@@ -937,7 +951,7 @@ GeocronExperiment::ApplyFailureModel () {
             Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (thisNetDevice);
             Ptr<Node> otherNode = otherNetDevice->GetNode ();
 
-            // NOTE: for simplicity, we opted to connect the BS's to
+            // HACK: NOTE: for simplicity, we opted to connect the BS's to
             // each other using P2P links rather than WiMAX, so here we
             // need to explicitly check if this link is between two BS's
             // and not fail it if that's the case.

@@ -87,8 +87,9 @@ def parse_args(args):
                         (e.g. rand, ideal, gsford[D=10], areageodivrp[A=0.5,B=1.5]...) (default=%(default)s)''')
     parser.add_argument('--nservers', default=['1'], nargs='+',
                         help='''number of servers for each node to attempt contact with when reporting data (default=%(default)s)''')
-    parser.add_argument('--npaths', default=['1'], nargs='+',
-                        help='''number of paths to send messages along when using overlay (default=%(default)s)''')
+    parser.add_argument('--npaths', default=['2'], nargs='+',
+                        help='''number of paths (including default direct path) to send messages along
+                        when using overlay (default=%(default)s)''')
     parser.add_argument('--contact_attempts', default=1, type=int,
                         help='''number of times a node will attempt to try another path after a timeout while using the overlay (default=%(default)s)''')
     parser.add_argument('--timeout', default=0.5, type=float,

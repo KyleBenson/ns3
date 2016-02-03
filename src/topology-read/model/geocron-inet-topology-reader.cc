@@ -199,7 +199,6 @@ GeocronInetTopologyReader::Read (void)
               link.SetAttribute ("Weight", linkAttr);
             }
           AddLink (link);
-          //TODO: set link attributes of BW and latency?
 
           linksNumber++;
         }
