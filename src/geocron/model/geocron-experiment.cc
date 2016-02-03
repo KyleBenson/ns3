@@ -147,7 +147,6 @@ GeocronExperiment::SetTimeout (Time newTimeout)
 bool
 GeocronExperiment::IsDisasterNode (Ptr<Node> node)
 {
-  //TODO: fix this?
   return disasterNodes[currLocation].count ((node)->GetId ());
 }
 
@@ -158,10 +157,12 @@ GeocronExperiment::IsOverlayNode (Ptr<Node> node)
   // This was for randomly choosing nodes to be in the overlay when using
   // topologies like BRITE, Rocketfuel.  Now, we explicitly place nodes of
   // different types in the topology and so can directly check this...
-  //
-  // first part handles if we didn't specify a max degree for overlay nodes, in which case ALL nodes are overlays...
+
+  return IsSeismicSensor (node) or IsBasestation (node);
+
+  // Old implementation: first part handles if we didn't specify a
+  // max degree for overlay nodes, in which case ALL nodes are overlays...
   //return !maxNDevs or GetNodeDegree (node) <= maxNDevs;
-  return IsSeismicSensor (node);// or IsBasestation (node);
 }
 
 
@@ -935,6 +936,14 @@ GeocronExperiment::ApplyFailureModel () {
             // get the necessary info for the other end of the link
             Ptr<NetDevice> otherNetDevice = GetOtherNetDevice (thisNetDevice);
             Ptr<Node> otherNode = otherNetDevice->GetNode ();
+
+            // NOTE: for simplicity, we opted to connect the BS's to
+            // each other using P2P links rather than WiMAX, so here we
+            // need to explicitly check if this link is between two BS's
+            // and not fail it if that's the case.
+            // TODO: remove this if we ever use wired links between BS's
+            if (IsBasestation (node) and IsBasestation (otherNode))
+              continue;
 
             if (ShouldFailLink(node, otherNode, disasterLocation))
               {
