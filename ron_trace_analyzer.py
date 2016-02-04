@@ -6,6 +6,11 @@ RON_TRACE_ANALYZER_DESCRIPTION = '''A helper script for analyzing ns3 Resilient 
 
 import argparse, os.path, os, decimal, math, heapq, sys, scipy.stats, itertools #numpy
 
+# Needs to be a global so that we can access it inside of the trace
+# parsing functions.  Originally hadn't planned on piping the args to
+# these functions as they only controlled the matplotlib output...
+global args
+
 ##################################################################################
 #################      ARGUMENTS       ###########################################
 # ArgumentParser.add_argument(name or flags...[, action][, nargs][, const][, default][, type][, choices][, required][, help][, metavar][, dest])
@@ -28,6 +33,11 @@ def ParseArgs():
                         help='''directories from which to read trace data files\
     (directories should group together runs from different parameters being studied). \
     Hidden files (those starting with '.') and subdirectories are ignored (use them to store parameters/observations/graphs).''')
+
+    # Misc control
+    #TODO: perhaps make this a list of strings and check if the nodes' types are in the list?
+    parser.add_argument('--types', type=str, default="all",
+                        help='''Types of nodes to consider messages from: ignore all others. Default: %(default)s''')
 
     # Labeling groups
     parser.add_argument('--label', '-l', nargs='+',
@@ -201,9 +211,10 @@ class Parameters:
     The parameters used for a simulation run.
     '''
     # NOTE: these indices ignore the actual filename as that gets sliced off!
-    FPROB_INDEX = -4
-    NSERVERS_INDEX = -3
-    NPATHS_INDEX = -2
+    FPROB_INDEX = -5
+    NSERVERS_INDEX = -4
+    NPATHS_INDEX = -3
+    TREATMENT_INDEX = -2
     HEURISTIC_INDEX = -1
 
     def __init__(self):
@@ -211,6 +222,7 @@ class Parameters:
         self.heuristic = ''
         self.nservers = 0
         self.npaths = 0
+        self.treatment = ''
         self.run = None
         #TODO: everything else
 
@@ -234,6 +246,14 @@ class Parameters:
         params.nservers = parts[Parameters.NSERVERS_INDEX]
         params.fprob = float(parts[Parameters.FPROB_INDEX])
         params.npaths = parts[Parameters.NPATHS_INDEX]
+        params.treatment = parts[Parameters.TREATMENT_INDEX]
+
+        if params.treatment == 's':
+            params.treatment = 'seismic'
+        elif params.treatment == 'w':
+            params.treatment = 'water'
+        elif params.treatment == 'sw' or params.treatment == 'ws':
+            params.treatment = 'seismic + water'
 
         return params
 
@@ -279,6 +299,15 @@ class TraceRun:
             for line in f.readlines():
                 parsed = line.split()
                 nodeId = parsed[TraceRun.NODE_ID_INDEX]
+                nodeType = parsed[TraceRun.NODE_TYPE_INDEX]
+
+                # we skip over node types that we aren't concerned with,
+                # except we need to make sure we still process the Servers!
+                # TODO: rather than skip over entirely, still add to other
+                # lists like forwards
+                if args.types != "all" and nodeType != args.types and nodeType != "Server":
+                    continue
+
                 try:
                     fromNodeId = parsed[TraceRun.FROM_NODE_INDEX]
                 except IndexError:
@@ -614,6 +643,7 @@ class TraceGroup:
 
 if __name__ == '__main__':
 
+    global args
     args = ParseArgs ()
 
     if not args.files and not args.dirs:
