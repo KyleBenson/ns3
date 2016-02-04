@@ -225,7 +225,7 @@ void GeocronExperiment::ReadGeocronInetTopology (std::string topologyFile)
   //
   //TODO: make these part of the object so we can change it
   //OR we could just determine it by the max/min x/y coordinates?
-  double boundaryLength = 50;
+  double boundaryLength = 50000;
 
   Ptr<BriteRegionHelper> regionHelper = DynamicCast<BriteRegionHelper> (GetRegionHelper ());
   NS_ASSERT_MSG (regionHelper, "Need BriteRegionHelper for ReadGeocronInetTopology!");
