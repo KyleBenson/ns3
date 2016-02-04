@@ -53,13 +53,16 @@ IntersectionGeodivrpRonPathHeuristic::GetDiversity (Ptr<PhysicalPath> path1, Ptr
 {
   // We substract 2 because we're ignoring the source and destination,
   // since we can assume they'll always be the same.
-#ifdef NS3_LOG_ENABLE
-  NodeContainer::Iterator itr1 = path1->NodesBegin (), itr2 = path2->NodesBegin ();
-  NS_ASSERT_MSG (((*itr1)->GetId () == (*itr2)->GetId ()), "Source nodes unexpectedly not equal!");
-  for (uint32_t i = 1; i < path1->GetNNodes (); itr1++, i++);
-  for (uint32_t i = 1; i < path2->GetNNodes (); itr2++, i++);
-  NS_ASSERT_MSG (((*itr1)->GetId () == (*itr2)->GetId ()), "Destination nodes unexpectedly not equal!");
-#endif
+  // NOTE: disabling this sanity check for now as it REALLY slows down
+  // non-optimizd simulations and we've been running this one for a 
+  // while with no assertions...
+//#ifdef NS3_LOG_ENABLE
+  //NodeContainer::Iterator itr1 = path1->NodesBegin (), itr2 = path2->NodesBegin ();
+  //NS_ASSERT_MSG (((*itr1)->GetId () == (*itr2)->GetId ()), "Source nodes unexpectedly not equal!");
+  //for (uint32_t i = 1; i < path1->GetNNodes (); itr1++, i++);
+  //for (uint32_t i = 1; i < path2->GetNNodes (); itr2++, i++);
+  //NS_ASSERT_MSG (((*itr1)->GetId () == (*itr2)->GetId ()), "Destination nodes unexpectedly not equal!");
+//#endif
 
   double overlap = ((double)path1->GetIntersectionSize (path2)) - 2;
   // Need to take the minimum length of the two paths as otherwise the order
