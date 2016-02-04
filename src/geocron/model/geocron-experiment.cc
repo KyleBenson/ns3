@@ -88,6 +88,8 @@ GeocronExperiment::GeocronExperiment ()
   appStopTime = Time (Seconds (30.0));
   simulationLength = Seconds (10.0);
   overlayPeers = Create<RonPeerTable> ();
+  // This should be set to a different table in ApplyExperimentalTreatment()
+  activeOverlayPeers = NULL;
   allPeers = RonPeerTable::GetMaster ();
 
   maxNDevs = 2;
@@ -99,6 +101,7 @@ GeocronExperiment::GeocronExperiment ()
   currRun = 0;
   currNPaths = 1;
   currNServers = 1;
+  currExperimentalTreatment = "default";
 
   contactAttempts = 10;
   traceFile = "";
@@ -465,6 +468,20 @@ GeocronExperiment::ReadRocketfuelTopology (std::string topologyFile)
 
 
 void
+GeocronExperiment::ApplyExperimentalTreatment (std::string treatment)
+{
+  currExperimentalTreatment = treatment;
+
+  if (treatment == "sw" or treatment == "ws")
+    activeOverlayPeers = overlayPeers;
+  else if (treatment == "s")
+    activeOverlayPeers = peersByType["seismicSensor"];
+  else if (treatment == "w")
+    activeOverlayPeers = peersByType["basestation"];
+}
+
+
+void
 GeocronExperiment::SetDisasterLocation (Location newDisasterLocation)
 {
   currLocation = newDisasterLocation;
@@ -513,6 +530,7 @@ GeocronExperiment::AutoSetTraceFile ()
 
   newTraceFile /= boost::lexical_cast<std::string> (currNServers);
   newTraceFile /= boost::lexical_cast<std::string> (currNPaths);
+  newTraceFile /= currExperimentalTreatment;
 
   // extract unique filename from heuristic to summarize parameters, aggregations, etc.
   // Do this by creating an instance of the current heuristic so that
@@ -561,47 +579,60 @@ GeocronExperiment::RunAllScenarios ()
   NS_LOG_UNCOND ("========================================================================");
   NS_LOG_INFO ("Running all scenarios...");
 
-  // Loop over all the possible scenarios, running the simulation and resetting between each
-  for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
-       disasterLocation != disasterLocations->end (); disasterLocation++)
-    {
-      SetDisasterLocation (*disasterLocation); 
-      for (std::vector<double>::iterator fprob = failureProbabilities->begin ();
-           fprob != failureProbabilities->end (); fprob++)
-        {
-          SetFailureProbability (*fprob);
-          for (currRun = 0; currRun < nruns; currRun++)
-            {
-              // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
-              // to each other for each configuration of failures
-              //
-              ApplyFailureModel ();
-              //
-              // TODO: if we go back to randomly picking servers,
-              // shouldn't we ensure that some portion of the same
-              // servers are chosen between runs so the randomness
-              // isn't due so much to the server choices?
-              for (uint32_t s = 0; s < nservers->size (); s++)
-              {
-                currNServers = nservers->at (s);
-                SetNextServers ();
+  // TODO: move this to a class member and set it via args rather than hard-coded
+  // Each treatment represents a custom experimental setup not accounted
+  // for in the rest of the simulation parameters.
+  std::vector<std::string> experimentalTreatments;
+  experimentalTreatments.push_back ("s");
+  experimentalTreatments.push_back ("w");
+  experimentalTreatments.push_back ("sw");
 
-                for (uint32_t p = 0; p < npaths->size (); p++)
-                {
-                  for (uint32_t h = 0; h < heuristics->size (); h++)
-                  {
-                    currHeuristic = heuristics->at (h);
-                    currNPaths = npaths->at (p);
-                    SeedManager::SetRun(runSeed++);
-                    AutoSetTraceFile ();
-                    Run ();
-                  }
-                }
+  // Loop over all the possible scenarios, running the simulation and resetting between each
+  for (std::vector<std::string>::iterator expTreatment = experimentalTreatments.begin ();
+      expTreatment != experimentalTreatments.end (); expTreatment++)
+  {
+    ApplyExperimentalTreatment (*expTreatment);
+    for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
+        disasterLocation != disasterLocations->end (); disasterLocation++)
+    {
+      SetDisasterLocation (*disasterLocation);
+      for (std::vector<double>::iterator fprob = failureProbabilities->begin ();
+          fprob != failureProbabilities->end (); fprob++)
+      {
+        SetFailureProbability (*fprob);
+        for (currRun = 0; currRun < nruns; currRun++)
+        {
+          // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
+          // to each other for each configuration of failures
+          //
+          ApplyFailureModel ();
+          //
+          // TODO: if we go back to randomly picking servers,
+          // shouldn't we ensure that some portion of the same
+          // servers are chosen between runs so the randomness
+          // isn't due so much to the server choices?
+          for (uint32_t s = 0; s < nservers->size (); s++)
+          {
+            currNServers = nservers->at (s);
+            SetNextServers ();
+
+            for (uint32_t p = 0; p < npaths->size (); p++)
+            {
+              for (uint32_t h = 0; h < heuristics->size (); h++)
+              {
+                currHeuristic = heuristics->at (h);
+                currNPaths = npaths->at (p);
+                SeedManager::SetRun(runSeed++);
+                AutoSetTraceFile ();
+                Run ();
               }
-              UnapplyFailureModel ();
             }
+          }
         }
+        UnapplyFailureModel ();
+      }
     }
+  }
 }
 
 
@@ -651,7 +682,7 @@ void
 GeocronExperiment::IndexNodes () {
   // This function iterates over all the nodes and builds various
   // structures that let us choose the following types of nodes:
-  // servers, disaster nodes, and all overlay nodes.
+  // servers, disaster nodes, nodes indexed by type, and all overlay nodes.
   // It also adds RonPeerEntry's to Nodes, sets region information,
   // and installs RonClientApplications, all of which is crucial.
   //
@@ -682,6 +713,7 @@ GeocronExperiment::IndexNodes () {
        node != nodes.End (); node++)
     {
       uint32_t degree = GetNodeDegree (*node);
+      std::string nodeType = GetNodeType (*node);
 
       // Sanity check that a node has some actual links, otherwise remove it from the simulation
       // this happened with some disconnected Rocketfuel models and made null pointers
@@ -735,12 +767,17 @@ GeocronExperiment::IndexNodes () {
       //
       // We may only install the overlay application on certain clients.
       // These may be explicitly defined (GeocronInet topology model) or
-      // they may be determined by checking if they are attached to stub networks,
+      // they may be determined by checking if they are attached to stub networks
+      // (their degree is less than a certain value).
       if (IsOverlayNode (*node))
         {
           overlayNodes.Add (*node);
           Ptr<RonPeerEntry> newEntry = overlayPeers->AddPeer (*node);
           allPeers->AddPeer (newEntry);
+
+          if (peersByType.count (nodeType) == 0)
+            peersByType[nodeType] = Create<RonPeerTable> ();
+          peersByType[nodeType]->AddPeer (newEntry);
         }
 
       // ROUTING NODES (choose servers)
@@ -867,9 +904,9 @@ GeocronExperiment::ShouldFailNode(Ptr<Node> node, Vector disasterLocation)
   double disasterRadius = regionHelper->GetRegionSize ();
   double thisFprob = currFprob / std::pow (2, distance / disasterRadius);
 
-  NS_LOG_UNCOND ("Fprob for Node " << GetNodeName (node) <<
-      " at distance " << distance << " from disaster at " <<
-      disasterLocation << " is " << thisFprob);
+  //NS_LOG_UNCOND ("Fprob for Node " << GetNodeName (node) <<
+      //" at distance " << distance << " from disaster at " <<
+      //disasterLocation << " is " << thisFprob);
 
   return (random->GetValue () < thisFprob);
 
@@ -1104,7 +1141,7 @@ Ptr<RonPeerTable>
 GeocronExperiment::GetPeerTableForPeer (Ptr<RonPeerEntry> peer)
 {
 #ifdef USE_FULL_PEER_TABLE
-  return overlayPeers;
+  return activeOverlayPeers;
 #else
   // We want to return the same peer table for a given peer so that each
   // heuristic will have an identical table.  We regenerate the tables
@@ -1148,19 +1185,19 @@ GeocronExperiment::Run ()
 {
   int numDisasterPeers = 0;
 
-  // Set up the proper heuristics, peer tables, and calculate the number of overlay nodes.
-  for (std::map<uint32_t, Ptr <Node> >::iterator nodeItr = disasterNodes[currLocation].begin ();
-       nodeItr != disasterNodes[currLocation].end (); nodeItr++)
-    /*  for (ApplicationContainer::Iterator app = disasterNodes[currLocation].Begin ();
-        app != clientApps.End (); app++)*/
+  // Set up the proper heuristics, peer tables, and calculate the
+  // number of active overlay nodes that will report data.
+  // NOTE: we used to only count peers in the disaster region as
+  // reporting data, so we may need to TODO: fix this at a later date
+  // if we go back to simulation wider regions than are affected by
+  // the disaster.
+  for (RonPeerTable::Iterator peerItr = activeOverlayPeers->Begin ();
+      peerItr != activeOverlayPeers->End (); peerItr++)
     {
-      // skip over routers
-      if (!IsOverlayNode (nodeItr->second))
-        continue;
-
+      Ptr<Node> node = (*peerItr)->node;
       // iterate over all applications just in case we add other apps later on...
-      for (uint32_t i = 0; i < nodeItr->second->GetNApplications (); i++) {
-        Ptr<RonClient> ronClient = DynamicCast<RonClient> (nodeItr->second->GetApplication (0));
+      for (uint32_t i = 0; i < node->GetNApplications (); i++) {
+        Ptr<RonClient> ronClient = DynamicCast<RonClient> (node->GetApplication (i));
         if (ronClient == NULL) {
           continue;
         }
@@ -1173,13 +1210,13 @@ GeocronExperiment::Run ()
         NS_ASSERT_MSG (heuristic, "Created heuristic is NULL! Bad heuristic name?");
         // Must set heuristic first so that source will be set and heuristic can make its heap
         heuristic->MakeTopLevel (); //must always do this! TODO: not need to?
-        heuristic->SetSourcePeer (nodeItr->second->GetObject<RonPeerEntry> ());
+        heuristic->SetSourcePeer (node->GetObject<RonPeerEntry> ());
 
         ronClient->SetHeuristic (heuristic);
         ronClient->SetServerPeerTable (serverPeers);
 
         // determine the peers this client, and likewise the heuristic, will know about
-        Ptr<RonPeerTable> table = GetPeerTableForPeer ((nodeItr->second)->GetObject<RonPeerEntry> ());
+        Ptr<RonPeerTable> table = GetPeerTableForPeer (node->GetObject<RonPeerEntry> ());
         ronClient->SetPeerTable (table);
         heuristic->SetPeerTable (table);
 
@@ -1196,11 +1233,6 @@ GeocronExperiment::Run ()
       }
     }
 
-  //NS_LOG_INFO ("Populating routing tables; please be patient it takes a while...");
-  //Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
-
-  //NS_LOG_INFO ("Done populating routing tables!");
-  
   ConnectAppTraces ();
 
   // pointToPoint.EnablePcap("rocketfuel-example",router_devices.Get(0),true);
@@ -1208,10 +1240,10 @@ GeocronExperiment::Run ()
   NS_LOG_INFO ("------------------------------------------------------------------------");
   NS_LOG_UNCOND ("Starting simulation on map file " << topologyFile << ": " << std::endl
                  << nodes.GetN () << " total nodes" << std::endl
-                 << overlayPeers->GetN () << " total overlay nodes" << std::endl
-                 << serverPeers->GetN () << " total servers" << std::endl
+                 << activeOverlayPeers->GetN () << " total active overlay nodes" << std::endl
+                 << serverPeers->GetN () << " total server(s)" << std::endl
                  << disasterNodes[currLocation].size () << " nodes in " << currLocation << " total" << std::endl
-                 << numDisasterPeers << " overlay nodes in " << currLocation << std::endl //TODO: get size from table
+                 << numDisasterPeers << " active overlay nodes reporting data in " << currLocation << std::endl //TODO: get size from table
                  << std::endl << "Failure probability: " << currFprob << std::endl
                  << failNodes.GetN () << " nodes failed" << std::endl
                  << ifacesToKill.GetN () / 2 << " links failed\n");

@@ -84,6 +84,13 @@ Ptr<NetDevice> GetOtherNetDevice (Ptr<NetDevice> thisDev)
   return (channel->GetDevice (0) == thisDev ? channel->GetDevice (1) : channel->GetDevice (0));
 }
 
+Ptr<Node> GetNodeById (uint32_t id)
+{
+  NodeContainer allNodes = NodeContainer::GetGlobal ();
+  NS_ASSERT_MSG (allNodes[id]->GetId () == id, "GetNodeById failed to get correct node...");
+  return allNodes[id];
+}
+
 // This is ripped directly from Ipv4NixVectorRouting and repeated here for convenience
 Ptr<Node> GetNodeByIp (Ipv4Address dest)
 {

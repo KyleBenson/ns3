@@ -17,6 +17,7 @@ namespace ns3 {
   Ipv4Address GetNodeAddress(Ptr<Node> node);
   uint32_t GetNodeDegree(Ptr<Node> node);
   Ptr<NetDevice> GetOtherNetDevice (Ptr<NetDevice> thisDev);
+  Ptr<Node> GetNodeById (uint32_t id);
   Ptr<Node> GetNodeByIp (Ipv4Address dest);
 
   std::string GetNodeType (Ptr<Node> node);

@@ -71,6 +71,7 @@ public:
   void SetTraceFile (std::string newTraceFile);
   void ConnectAppTraces ();
   
+  void ApplyExperimentalTreatment (std::string treatment);
   void SetDisasterLocation (Location newDisasterLocation);
   void SetFailureProbability (double newFailureProbability);
   Ptr<RonPeerTable> GetPeerTableForPeer (Ptr<RonPeerEntry> peer);
@@ -116,15 +117,24 @@ private:
   uint32_t currNPaths; //current multipath fanout
   uint32_t currNServers; //current number of servers to choose
   uint32_t currRun; //keep at 32 as it's used as a string later
+  std::string currExperimentalTreatment; // misc custom experiments
   Time timeout;
   Time simulationLength;
 
   NodeContainer nodes;
   ApplicationContainer clientApps;
   ApplicationContainer serverApps;
-  Ptr<RonPeerTable> overlayPeers;
-  Ptr<RonPeerTable> allPeers;
-  Ptr<RonPeerTable> serverPeers;
+  Ptr<RonPeerTable> overlayPeers; // all overlay participants
+  // Only these peers will be active when the experiment is run
+  Ptr<RonPeerTable> activeOverlayPeers;
+  Ptr<RonPeerTable> serverPeers; // servers don't count as in overlay
+  Ptr<RonPeerTable> allPeers; // all peers, whether in overlay or not
+  // This map stores peers indexed by their type (as returned by GetNodeType())
+  // Used for setting up experiments with only certain types of peers
+  // participating in the overlay.
+  // NOTE: servers are not currently included!
+  // NOTE: only seismicSensor and basestation types are included currently
+  std::map<std::string, Ptr<RonPeerTable> > peersByType;
   NodeContainer serverNodes;
   std::string topologyFile;
 

@@ -26,10 +26,10 @@ void PacketForwarded (Ptr<OutputStreamWrapper> stream, Ptr<const Packet> p, uint
 {
   RonHeader head;
   p->PeekHeader (head);
-  Ptr<Node> originNode = GetNodeByIp (head.GetOrigin ());
+  Ptr<Node> thisNode = GetNodeById (nodeId);
   
   std::stringstream s;
-  s << GetNodeType (originNode) << " " << nodeId << " forwarded packet (hop=" << (int)head.GetHop () << ") at " << Simulator::Now ().GetSeconds ()
+  s << GetNodeType (thisNode) << " " << nodeId << " forwarded packet (hop=" << (int)head.GetHop () << ") at " << Simulator::Now ().GetSeconds ()
     << " from " << head.GetOrigin () << " to " << head.GetNextDest () << " and eventually " << head.GetFinalDest ();
 
   NS_LOG_INFO (s.str ());
