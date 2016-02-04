@@ -576,6 +576,8 @@ GeocronExperiment::RunAllScenarios ()
   SeedManager::SetSeed(seed);
   int runSeed = 0;
 
+  NS_LOG_UNCOND ("Seed is " << seed);
+
   NS_LOG_UNCOND ("========================================================================");
   NS_LOG_INFO ("Running all scenarios...");
 
@@ -588,29 +590,29 @@ GeocronExperiment::RunAllScenarios ()
   experimentalTreatments.push_back ("sw");
 
   // Loop over all the possible scenarios, running the simulation and resetting between each
-  for (std::vector<std::string>::iterator expTreatment = experimentalTreatments.begin ();
-      expTreatment != experimentalTreatments.end (); expTreatment++)
+  for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
+      disasterLocation != disasterLocations->end (); disasterLocation++)
   {
-    ApplyExperimentalTreatment (*expTreatment);
-    for (std::vector<Location>::iterator disasterLocation = disasterLocations->begin ();
-        disasterLocation != disasterLocations->end (); disasterLocation++)
+    SetDisasterLocation (*disasterLocation);
+    for (std::vector<double>::iterator fprob = failureProbabilities->begin ();
+        fprob != failureProbabilities->end (); fprob++)
     {
-      SetDisasterLocation (*disasterLocation);
-      for (std::vector<double>::iterator fprob = failureProbabilities->begin ();
-          fprob != failureProbabilities->end (); fprob++)
+      SetFailureProbability (*fprob);
+      for (currRun = 0; currRun < nruns; currRun++)
       {
-        SetFailureProbability (*fprob);
-        for (currRun = 0; currRun < nruns; currRun++)
+        // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
+        // to each other for each configuration of failures
+        //
+        ApplyFailureModel ();
+        //
+        // TODO: if we go back to randomly picking servers,
+        // shouldn't we ensure that some portion of the same
+        // servers are chosen between runs so the randomness
+        // isn't due so much to the server choices?
+        for (std::vector<std::string>::iterator expTreatment = experimentalTreatments.begin ();
+            expTreatment != experimentalTreatments.end (); expTreatment++)
         {
-          // We want to compare each heuristic configuration (which heuristic, multipath fanout, etc.)
-          // to each other for each configuration of failures
-          //
-          ApplyFailureModel ();
-          //
-          // TODO: if we go back to randomly picking servers,
-          // shouldn't we ensure that some portion of the same
-          // servers are chosen between runs so the randomness
-          // isn't due so much to the server choices?
+          ApplyExperimentalTreatment (*expTreatment);
           for (uint32_t s = 0; s < nservers->size (); s++)
           {
             currNServers = nservers->at (s);
@@ -1239,6 +1241,7 @@ GeocronExperiment::Run ()
 
   NS_LOG_INFO ("------------------------------------------------------------------------");
   NS_LOG_UNCOND ("Starting simulation on map file " << topologyFile << ": " << std::endl
+      //TODO: print the current heuristic name: need to gettypeid from objectfactory and then...
                  << nodes.GetN () << " total nodes" << std::endl
                  << activeOverlayPeers->GetN () << " total active overlay nodes" << std::endl
                  << serverPeers->GetN () << " total server(s)" << std::endl
