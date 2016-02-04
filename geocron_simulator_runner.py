@@ -13,7 +13,7 @@ from os import system
 default_runs=20
 default_start=0 # num to start run IDs on
 default_nprocs=8
-default_file=['src/topology-read/examples/small-geocron-network.txt',
+default_file=['src/topology-read/examples/geocron_topology.txt',
               #'src/brite/examples/conf_files/TD_ASBarabasi_RTWaxman200.conf',
               #'3356', #level3
               #'1239', #sprintlink
@@ -24,19 +24,23 @@ default_file=['src/topology-read/examples/small-geocron-network.txt',
               #'3967',
               ]
 default_heuristics=['rand',
-                    'ortho',
-                    'newreg',
-                    'close',
-                    'far',
-                    'angle',
-                    'dist',
+                    'areageodivrp',
+                    'intergeodivrp',
+                    'gsford',
+                    'ideal',
+                    #'ortho',
+                    #'newreg',
+                    #'close',
+                    #'far',
+                    #'angle',
+                    #'dist',
                     ]
 default_fprobs=["0.1",
                 "0.2",
-                "0.3",
+                #"0.3",
                 "0.4",
-                "0.5",
-                #"0.6"
+                #"0.5",
+                "0.6"
                 ]
 #TODO: make this configurable for BRITE topology...
 default_disasters = {'3356' : '0,0'}
