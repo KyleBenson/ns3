@@ -110,6 +110,14 @@ GeocronExperiment::GeocronExperiment ()
   start_run_number = 0;
 
   regionHelper = NULL;
+
+  // Setup random number stream stuff before the random number
+  // generator for this object is created
+  // set the seed using both clock and pid so that simultaneously running sims don't overlap
+  std::size_t seed = 0;
+  boost::hash_combine (seed, std::time (NULL));
+  boost::hash_combine (seed, getpid());
+  SeedManager::SetSeed(seed);
 }
 
 
@@ -569,17 +577,10 @@ GeocronExperiment::AutoSetTraceFile ()
 void
 GeocronExperiment::RunAllScenarios ()
 {
-  //set the seed using both clock and pid so that simultaneously running sims don't overlap
-  std::size_t seed = 0;
-  boost::hash_combine (seed, std::time (NULL));
-  boost::hash_combine (seed, getpid());
-  SeedManager::SetSeed(seed);
-  int runSeed = 0;
-
-  NS_LOG_UNCOND ("Seed is " << seed);
-
   NS_LOG_UNCOND ("========================================================================");
   NS_LOG_INFO ("Running all scenarios...");
+
+  int runSeed = 0;
 
   // TODO: move this to a class member and set it via args rather than hard-coded
   // Each treatment represents a custom experimental setup not accounted
@@ -609,20 +610,20 @@ GeocronExperiment::RunAllScenarios ()
         // shouldn't we ensure that some portion of the same
         // servers are chosen between runs so the randomness
         // isn't due so much to the server choices?
-        for (std::vector<std::string>::iterator expTreatment = experimentalTreatments.begin ();
-            expTreatment != experimentalTreatments.end (); expTreatment++)
+        for (uint32_t h = 0; h < heuristics->size (); h++)
         {
-          ApplyExperimentalTreatment (*expTreatment);
-          for (uint32_t s = 0; s < nservers->size (); s++)
+          currHeuristic = heuristics->at (h);
+          for (std::vector<std::string>::iterator expTreatment = experimentalTreatments.begin ();
+              expTreatment != experimentalTreatments.end (); expTreatment++)
           {
-            currNServers = nservers->at (s);
-            SetNextServers ();
-
-            for (uint32_t p = 0; p < npaths->size (); p++)
+            ApplyExperimentalTreatment (*expTreatment);
+            for (uint32_t s = 0; s < nservers->size (); s++)
             {
-              for (uint32_t h = 0; h < heuristics->size (); h++)
+              currNServers = nservers->at (s);
+              SetNextServers ();
+
+              for (uint32_t p = 0; p < npaths->size (); p++)
               {
-                currHeuristic = heuristics->at (h);
                 currNPaths = npaths->at (p);
                 SeedManager::SetRun(runSeed++);
                 AutoSetTraceFile ();
@@ -1247,6 +1248,7 @@ GeocronExperiment::Run ()
                  << serverPeers->GetN () << " total server(s)" << std::endl
                  << disasterNodes[currLocation].size () << " nodes in " << currLocation << " total" << std::endl
                  << numDisasterPeers << " active overlay nodes reporting data in " << currLocation << std::endl //TODO: get size from table
+                 << "Experimental treatment " << currExperimentalTreatment << std::endl
                  << std::endl << "Failure probability: " << currFprob << std::endl
                  << failNodes.GetN () << " nodes failed" << std::endl
                  << ifacesToKill.GetN () / 2 << " links failed\n");
