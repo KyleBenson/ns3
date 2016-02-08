@@ -267,7 +267,11 @@ class TraceRun:
     NODE_ID_INDEX = 1
     ACTION_INDEX = 2
     DIRECT_ACK_INDEX = 3
+    # packet = 4
+    # at = 5
     TIME_INDEX = 6
+    # from = 7
+    FROM_NODE_TYPE_INDEX = 8
     FROM_NODE_INDEX = 9
 
     TIME_RESOLUTION = 0.01 #In seconds
@@ -308,18 +312,29 @@ class TraceRun:
                 if args.types != "all" and nodeType != args.types and nodeType != "Server":
                     continue
 
+                # From node info only included in certain trace lines
                 try:
                     fromNodeId = parsed[TraceRun.FROM_NODE_INDEX]
                 except IndexError:
                     fromNodeId = None
-                node = self.nodes.get(nodeId)
+
+                try:
+                    fromNodeType = parsed[TraceRun.FROM_NODE_TYPE_INDEX]
+                except IndexError:
+                    fromNodeType = None
+
+                # We need to skip over packets received FROM node types
+                # we aren't concerned with as well.
+                if fromNodeType is not None and args.types != "all" and fromNodeType != args.types and fromNodeType != "Server":
+                    continue
 
                 if len(parsed) > TraceRun.TIME_INDEX:
                     time = round(float(parsed[TraceRun.TIME_INDEX]), sigDigits)
 
-                if not node:
+                node = self.nodes.get(nodeId)
+                if node is None:
                     node = self.nodes[nodeId] = TraceNode(nodeId)
-                    #print 'creating node %s' % nodeId
+                    #print 'creating node %s' % nodeId, "of type", nodeType
 
                 # We need to be careful that we only store one ACK per node or
                 # we will end up with incorrect data, e.g. delivery ratio > 1.0
@@ -354,6 +369,8 @@ class TraceRun:
                 # Rather than consider only ACKs, we also consider the
                 # server simply receiving packets as sometimes it will
                 # do so but is unable to properly ACK the message
+                # NOTE: this accounts for the first msg, either direct
+                # or indirect, that the server receives.
                 if parsed[TraceRun.NODE_TYPE_INDEX] == 'Server' and 'received' == parsed[TraceRun.ACTION_INDEX] and fromNodeId and fromNodeId not in self.nodesHeardFrom:
                     self.recvTimes[time] = self.recvTimes.get(time, 0) + 1
                     self.nodesHeardFrom[fromNodeId] = time
@@ -504,10 +521,13 @@ class TraceGroup:
             print folder, "is not a directory!"
 
     def getNameByParams(self, params):
-        name = "%s[f=%s,S=%s,k=%s]" % (params.heuristic,
+        name = "%s[f=%s,k=%s]" % (params.heuristic,
                                  params.fprob,
-                                 params.nservers,
                                  params.npaths)
+        #name = "%s[f=%s,S=%s,k=%s]" % (params.heuristic,
+                                 #params.fprob,
+                                 #params.nservers,
+                                 #params.npaths)
         name = name.replace("][", ",")
         name = name.replace("|", ",")
         return name
