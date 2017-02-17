@@ -258,7 +258,7 @@ if __name__ == "__main__":
         c.wait()
 
     if not args.no_email:
-        subprocess.call('ssmtp kyle.edward.benson@gmail.com < done_sims.email', shell=True)
+        subprocess.call('ssmtp kebenson@ics.uci.edu < done_sims.email', shell=True)
         #TODO: add stuff to email: time, 
 
     #if args.optimized:
